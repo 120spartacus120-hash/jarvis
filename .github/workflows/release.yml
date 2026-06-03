@@ -48,6 +48,7 @@ jobs:
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm exec --prefix frontend tauri -- build --config crates/jarvis-gui/tauri.conf.json --ignore-version-mismatches
 
       - name: Generate updater latest.json
