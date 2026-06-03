@@ -5,7 +5,7 @@
   "identifier": "com.priler.jarvis",
   "build": {
     "beforeDevCommand": "",
-    "beforeBuildCommand": "npm run build --prefix ../frontend",
+    "beforeBuildCommand": "npm run build --prefix ../../frontend",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../../frontend/dist/client"
   },
@@ -36,7 +36,7 @@
       "../../resources/icons/icon.icns",
       "../../resources/icons/icon.ico"
     ],
-    "targets": "all",
+    "targets": ["nsis"],
     "resources": {
       "../../resources/commands": "resources/commands",
       "../../resources/sound": "resources/sound",
