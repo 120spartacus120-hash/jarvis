@@ -1,0 +1,152 @@
+.form-page {
+    padding: 8px 16px 24px;
+    max-width: 520px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.form-page .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.85rem;
+    padding: 0.35rem 0.55rem;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.78rem;
+    cursor: pointer;
+
+    &:hover {
+        color: #52fefe;
+    }
+}
+
+.form-page .form-header {
+    text-align: center;
+    margin-bottom: 1.25rem;
+
+    h1 {
+        margin: 0 0 0.45rem;
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: 0.01em;
+    }
+
+    p {
+        margin: 0;
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.45);
+        line-height: 1.45;
+    }
+}
+
+.form-page .form-section {
+    margin-bottom: 1rem;
+    padding: 0.85rem 0.9rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(18, 28, 34, 0.72);
+}
+
+.form-page .section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.65rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.form-page .step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    background: rgba(82, 254, 254, 0.15);
+    color: #52fefe;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.form-page .section-hint {
+    margin: -0.25rem 0 0.65rem;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.42);
+    line-height: 1.4;
+}
+
+.form-page .phrase-add {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.form-page .phrase-list {
+    list-style: none;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    max-height: 220px;
+    overflow-y: auto;
+
+    li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.55rem 0.75rem;
+        border-radius: 8px;
+        background: rgba(10, 18, 22, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.88);
+        font-size: 0.8rem;
+    }
+}
+
+.form-page .remove-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: rgba(255, 120, 120, 0.85);
+    cursor: pointer;
+    padding: 0.15rem;
+    flex-shrink: 0;
+}
+
+.form-page .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-top: 1.25rem;
+    padding-top: 0.25rem;
+}
+
+.form-page :global(.save-btn) {
+    width: 100%;
+}
+
+.form-page .hint,
+.form-page .empty-phrases {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.78rem;
+    margin: 0.65rem 0 0;
+}
+
+.form-page .alerts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
