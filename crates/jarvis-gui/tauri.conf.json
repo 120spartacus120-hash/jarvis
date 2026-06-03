@@ -53,7 +53,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUzRjhBOTAzMUJGNDVENkQKUldSdFhmUWJBNm40NDlQY2d6M0hqS2pqdEN1dWNuT2p0RzRWM0VKTDgvTkFxbHkwZTNrZTJZZjAK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk1MzFBRjM3OEMzNDY4MDMKUldRRGFEU01ONjh4bGY1ZEc2VkpvbjdXbDdUZEs3T0lWNGdOZFdSdUtuSXdHdTU5UzlBeFlzdDQK",
       "endpoints": [
         "https://github.com/120spartacus120-hash/jarvis/releases/latest/download/latest.json"
       ],
