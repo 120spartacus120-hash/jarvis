@@ -23,22 +23,24 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Build frontend
-        run: npm ci && npm run build
         working-directory: frontend
+        run: npm ci; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run build; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        shell: pwsh
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
 
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: . -> target
+          shared-key: jarvis-release
+          cache-all-crates: true
 
-      - name: Build jarvis-app and copy native libraries
-        shell: bash
-        run: |
-          cargo build --release -p jarvis-app --target x86_64-pc-windows-msvc
-          python scripts/tools/post_build.py --force
+      - name: Build jarvis-app
+        run: cargo build --release -p jarvis-app
+        shell: pwsh
+
+      - name: Copy native libraries to target/release
+        run: python scripts/tools/post_build.py --force
+        shell: pwsh
 
       - name: Build and release Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -57,4 +59,3 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
-          args: --target x86_64-pc-windows-msvc
