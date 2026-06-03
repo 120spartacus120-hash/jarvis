@@ -18,6 +18,13 @@ tray-gain-normalizer = Нормализация громкости
 header-commands = КОМАНДЫ
 header-settings = НАСТРОЙКИ
 
+# UPDATES
+update-available = Доступно обновление { $version }
+update-install = Обновить
+update-later = Позже
+update-downloading = Загрузка… { $percent }%
+update-error = Ошибка обновления
+
 # SEARCH
 search-placeholder = Введите команду вручную или произнесите «Джарвис» ...
 

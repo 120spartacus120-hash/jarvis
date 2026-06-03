@@ -18,6 +18,13 @@ tray-gain-normalizer = Gain Normalizer
 header-commands = COMMANDS
 header-settings = SETTINGS
 
+# ### UPDATES
+update-available = Update available: { $version }
+update-install = Update
+update-later = Later
+update-downloading = Downloading… { $percent }%
+update-error = Update failed
+
 # ### SEARCH
 search-placeholder = Enter a command manually or say «Jarvis» ...
 
