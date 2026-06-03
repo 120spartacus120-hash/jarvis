@@ -1,65 +1,97 @@
-# JARVIS Voice Assistant (this readme is outdated)
+<div align="center">
+  <img src="resources/icons/128x128.png" alt="JARVIS Logo" width="128" height="128">
+  
+  # JARVIS Voice Assistant
+  
+  **Умный голосовой ассистент для Windows, работающий полностью оффлайн.**
+  
+  [![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+  [![Tauri](https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
+  [![Svelte](https://img.shields.io/badge/Svelte-FF3E00?style=for-the-badge&logo=svelte&logoColor=white)](https://svelte.dev/)
+  [![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+</div>
 
-![We are NOT limited by the technology of our time!](resources/poster.jpg)
+---
 
-`Jarvis` - is a voice assistant made as an experiment using neural networks for things like **STT/TTS/Wake Word/NLU** etc.
+## 🌟 О проекте
 
-The main project challenges we try to achieve is:
- - 100% offline *(no cloud)*
- - Open source *(full transparency)*
- - No data collection *(we respect your privacy)*
+**JARVIS** — это современный голосовой ассистент, созданный с упором на приватность и скорость работы. В отличие от большинства современных решений, Jarvis не отправляет ваши голосовые команды в облако. Все нейросети работают локально на вашем компьютере.
 
-Our backend stack is 🦀 **[Rust](https://www.rust-lang.org/)** with ❤️ **[Tauri](https://tauri.app/)**.<br>
-For the frontend we use ⚡️ **[Vite](https://vitejs.dev/)** + 🛠️ **[Svelte](https://svelte.dev/)**.
+### Ключевые особенности:
+- 🔒 **100% Оффлайн** — не требует подключения к интернету для распознавания речи.
+- 🛡️ **Приватность** — ваши данные остаются только на вашем устройстве.
+- ⚡ **Скорость** — мгновенный отклик благодаря нативному ядру на Rust.
+- 🔄 **Автообновления** — встроенная система бесшовных обновлений (Tauri Updater).
+- 🎨 **Минималистичный дизайн** — удобный и лёгкий интерфейс на Svelte.
 
-*Other libraries, tools and packages can be found in source code.*
+---
 
-## Neural Networks
+## 🧠 Технологии под капотом
 
-This are the neural networks we are currently using:
+Проект использует передовые локальные нейросети для обработки голоса:
 
- - Speech-To-Text
-	 - [Vosk Speech Recognition Toolkit](https://github.com/alphacep/vosk-api) via [Vosk-rs](https://github.com/Bear-03/vosk-rs)
- - Text-To-Speech
-	 - [~~Silero TTS~~](https://github.com/snakers4/silero-models) *(currently not used)*
-	 - [~~Coqui TTS~~](https://github.com/coqui-ai/TTS) *(currently not used)*
-	 - [~~WinRT~~](https://github.com/ndarilek/tts-rs) *(currently not used)*
-	 - [~gTTS~](https://github.com/nightlyistaken/tts_rust) *(currently not used)*
-	 - [~~SAM~~](https://github.com/s-macke/SAM) *(currently not used)*
- - Wake Word
-	 - [Rustpotter](https://github.com/GiviMAD/rustpotter) *(Partially implemented, still WIP)*
-	 - [Picovoice Porcupine](https://github.com/Picovoice/porcupine) via [official SDK](https://github.com/Picovoice/porcupine#rust) *(requires API key)*
-	 - [Vosk Speech Recognition Toolkit](https://github.com/alphacep/vosk-api) via [Vosk-rs](https://github.com/Bear-03/vosk-rs) *(very slow)*
-	 - [~~Snowboy~~](https://github.com/Kitt-AI/snowboy) *(currently not used)*
- - NLU
-	 - Nothing yet.
-- Chat
-	- [~~ChatGPT~~](https://chat.openai.com/) (coming soon)
+*   **Распознавание речи (STT):**
+    *   [Vosk Speech Recognition Toolkit](https://github.com/alphacep/vosk-api) — быстрый и точный движок.
+*   **Активация голосом (Wake Word):**
+    *   [Picovoice Porcupine](https://github.com/Picovoice/porcupine) — высокоточный детектор ключевых слов.
+    *   [Rustpotter](https://github.com/GiviMAD/rustpotter) — открытая альтернатива (в разработке).
+*   **Интерфейс и Ядро:**
+    *   **Backend:** Rust + Tauri (максимальная производительность и минимальное потребление ОЗУ).
+    *   **Frontend:** Svelte + Vite (быстрый и отзывчивый UI).
 
-## Supported Languages
+---
 
-Currently, only Russian language is supported.<br>
-But soon, Ukranian and English will be added for the interface, wake-word detection and speech recognition.
+## 🌍 Поддерживаемые языки
 
-## How to build?
+В данный момент ассистент полностью поддерживает **Русский язык** (интерфейс, распознавание речи, команды).
+В планах добавление Украинского и Английского языков.
 
-Nothing special was used to build this project.<br>
-You need only Rust and NodeJS installed on your system.<br>
-Other than that, all you need is to install all the dependencies and then compile the code with `cargo tauri build` command.<br>
-Or run dev with `cargo tauri dev`.
+---
 
-<br><br>
-*Thought you might need some of the platform specific libraries for [PvRecorder](https://github.com/Picovoice/pvrecorder) and [Vosk](https://github.com/alphacep/vosk-api).*
+## 🚀 Установка и использование
 
-## Author
+Самый простой способ начать использовать JARVIS — скачать готовый установщик из раздела Releases:
 
-Abraham Tugalov
+1. Перейдите на страницу [Releases](https://github.com/120spartacus120-hash/jarvis/releases/latest).
+2. Скачайте файл `JARVIS_..._x64-setup.exe`.
+3. Запустите установщик и следуйте инструкциям.
+4. Программа автоматически будет проверять наличие обновлений при каждом запуске!
 
-## Python version?
-Old version of Jarvis was built with Python.<br>
-The last Python version commit can be found [here](https://github.com/Priler/jarvis/tree/943efbfbdb8aeb5889fa5e2dc7348ca4ea0b81df).
+---
 
-## License
+## 🛠️ Сборка из исходников (Для разработчиков)
 
-[Attribution-NonCommercial-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/)<br>
-See LICENSE.txt file for more details.
+Если вы хотите собрать проект самостоятельно или поучаствовать в разработке:
+
+### Требования:
+- [Rust](https://www.rust-lang.org/tools/install) (stable)
+- [Node.js](https://nodejs.org/) (v20+)
+- Инструменты сборки C++ для Windows (Visual Studio Build Tools)
+
+### Инструкция:
+1. Клонируйте репозиторий:
+   ```bash
+   git clone https://github.com/120spartacus120-hash/jarvis.git
+   cd jarvis
+   ```
+2. Установите зависимости фронтенда:
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+3. Запустите проект в режиме разработки:
+   ```bash
+   npm run tauri dev --prefix frontend
+   ```
+4. Для сборки готового `.exe` файла:
+   ```bash
+   npm run tauri build --prefix frontend
+   ```
+
+---
+
+## 📜 Лицензия
+
+Проект распространяется под лицензией [Attribution-NonCommercial-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+Подробности в файле `LICENSE.txt`.
