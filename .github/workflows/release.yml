@@ -45,11 +45,10 @@ jobs:
       # tauri-action with npm run tauri --prefix frontend passes "build" to npm, not tauri CLI.
       # Run the frontend-installed CLI from the Tauri project directory instead.
       - name: Build and bundle Tauri installer
-        working-directory: crates/jarvis-gui
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: npm exec --prefix ../../frontend tauri -- build
+        run: npm exec --prefix frontend tauri -- build --config crates/jarvis-gui/tauri.conf.json --ignore-version-mismatches
 
       - name: Generate updater latest.json
         shell: pwsh

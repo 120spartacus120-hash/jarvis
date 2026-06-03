@@ -5,7 +5,7 @@
   "identifier": "com.priler.jarvis",
   "build": {
     "beforeDevCommand": "",
-    "beforeBuildCommand": "npm run build --prefix ../../frontend",
+    "beforeBuildCommand": "",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../../frontend/dist/client"
   },
