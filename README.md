@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="resources/icons/128x128.png" alt="JARVIS Logo" width="128" height="128">
+  <img src="resources/icons/128x128.png" alt="JARVIS Logo" width="128" height="128" style="border-radius: 20px;">
   
   # JARVIS Voice Assistant
   
