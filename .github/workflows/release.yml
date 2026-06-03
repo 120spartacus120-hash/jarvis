@@ -42,20 +42,54 @@ jobs:
         run: python scripts/tools/post_build.py --force
         shell: pwsh
 
-      - name: Build and release Tauri app
-        uses: tauri-apps/tauri-action@v0
+      # tauri-action with npm run tauri --prefix frontend passes "build" to npm, not tauri CLI.
+      # Run the frontend-installed CLI from the Tauri project directory instead.
+      - name: Build and bundle Tauri installer
+        working-directory: crates/jarvis-gui
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: npm exec --prefix ../../frontend tauri -- build
+
+      - name: Generate updater latest.json
+        shell: pwsh
+        run: |
+          $nsisDir = "target/release/bundle/nsis"
+          $setup = Get-ChildItem "$nsisDir/*-setup.exe" | Select-Object -First 1
+          $sig = Get-ChildItem "$nsisDir/*.exe.sig" | Select-Object -First 1
+          if (-not $setup -or -not $sig) {
+            Write-Error "NSIS installer or .sig not found in $nsisDir"
+            exit 1
+          }
+          $conf = Get-Content "crates/jarvis-gui/tauri.conf.json" -Raw | ConvertFrom-Json
+          $tag = "${{ github.ref_name }}"
+          $url = "https://github.com/${{ github.repository }}/releases/download/$tag/$($setup.Name)"
+          $manifest = @{
+            version = $conf.version
+            notes = "JARVIS $tag"
+            pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = (Get-Content $sig.FullName -Raw).Trim()
+                url = $url
+              }
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content "$nsisDir/latest.json" -Encoding utf8
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
-          projectPath: crates/jarvis-gui
-          tauriScript: npm run tauri --prefix frontend
-          tagName: ${{ github.ref_name }}
-          releaseName: JARVIS ${{ github.ref_name }}
-          releaseBody: |
+          tag_name: ${{ github.ref_name }}
+          name: JARVIS ${{ github.ref_name }}
+          body: |
             Установите обновление кнопкой «Обновить» в программе
             или скачайте установщик ниже.
-          releaseDraft: false
+          draft: false
           prerelease: false
-          includeUpdaterJson: true
-          updaterJsonPreferNsis: true
+          files: |
+            target/release/bundle/nsis/*.exe
+            target/release/bundle/nsis/*.exe.sig
+            target/release/bundle/nsis/latest.json
