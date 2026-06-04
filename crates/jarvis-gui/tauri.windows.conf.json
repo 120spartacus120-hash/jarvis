@@ -1,0 +1,27 @@
+{
+  "bundle": {
+    "shortDescription": "Голосовой ассистент JARVIS для Windows",
+    "longDescription": "JARVIS — голосовой ассистент: команды, микрофон, обновления с GitHub. Официальный установщик с сайта релизов.",
+    "licenseFile": "../../resources/installer/license.txt",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "languages": ["Russian", "English"],
+        "displayLanguageSelector": false,
+        "installerIcon": "../../resources/icons/icon.ico",
+        "headerImage": "../../resources/icons/icon.png",
+        "sidebarImage": "../../resources/icons/icon.png",
+        "installMode": "currentUser",
+        "compression": "lzma",
+        "installerHooks": "../../resources/installer/hooks.nsh",
+        "startMenuFolder": "JARVIS",
+        "customLanguageFiles": {
+          "Russian": "../../resources/installer/nsis-locale-ru.nsh"
+        }
+      }
+    }
+  }
+}

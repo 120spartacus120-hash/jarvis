@@ -48,6 +48,8 @@ fn main() -> Result<(), String> {
     DB.set(settings.arc().clone())
             .expect("DB already initialized");
 
+    db::spawn_settings_file_watcher();
+
     // init voices
     let voice_id = settings.lock().voice.clone();
     let language = settings.lock().language.clone();
@@ -137,6 +139,12 @@ fn main() -> Result<(), String> {
                 info!("Received reload commands request");
                 set_commands_list(custom_commands::reload_commands_list());
             }
+            IpcAction::ReloadSettings => {
+                match db::reload_global_settings() {
+                    Ok(()) => info!("Settings reloaded from disk"),
+                    Err(e) => error!("Failed to reload settings: {}", e),
+                }
+            }
             IpcAction::SetMuted { muted } => {
                 info!("Received mute request: {}", muted);
                 // TODO: implement mute
@@ -150,7 +158,6 @@ fn main() -> Result<(), String> {
             IpcAction::Ping => {
                 // handled internally by server
             }
-            _ => {}
         }
     });
 

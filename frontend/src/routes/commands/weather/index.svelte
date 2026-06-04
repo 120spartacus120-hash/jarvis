@@ -6,9 +6,11 @@
     import HDivider from "@/components/elements/HDivider.svelte"
     import Footer from "@/components/Footer.svelte"
     import { translations, translate } from "@/stores"
+    import { reloadSettings } from "@/lib/ipc"
     import { loadCustomCommands, saveCustomCommands, normalizePhrases } from "@/lib/customCommands"
+    import { resolveWeatherCity, WEATHER_CITIES } from "@/lib/weatherCities"
 
-    import { Button, Input, Alert } from "@svelteuidev/core"
+    import { Button, Alert, NativeSelect } from "@svelteuidev/core"
     import { Plus, Trash, ArrowLeft } from "radix-icons-svelte"
 
     $: t = (key: string, args?: Record<string, string | number>) => translate($translations, key, args)
@@ -37,7 +39,7 @@
             thanksPhrases = [...(config.thanks_phrases ?? [])]
             shutdownPhrases = [...(config.shutdown_phrases ?? [])]
             userCommands = [...(config.user_commands ?? [])]
-            weatherCity = city ?? ""
+            weatherCity = resolveWeatherCity(city)
         } catch (err) {
             console.error("failed to load weather command:", err)
             loadError = t("error-generic")
@@ -47,23 +49,28 @@
     }
 
     async function saveConfig() {
-        const city = weatherCity.trim()
-        if (!city) {
-            saveError = t("commands-weather-city-required")
-            return
-        }
+        const city = resolveWeatherCity(weatherCity)
+        weatherCity = city
 
         saving = true
         saved = false
         saveError = ""
         try {
-            await invoke("db_write", { key: "weather_city", val: city })
+            const ok = await invoke<boolean>("db_write", { key: "weather_city", val: city })
+            if (!ok) {
+                saveError = t("error-generic")
+                return
+            }
+
+            await reloadSettings()
+
             await saveCustomCommands({
                 thanks_phrases: thanksPhrases,
                 shutdown_phrases: shutdownPhrases,
                 weather_phrases: normalizePhrases(phrases),
                 user_commands: userCommands,
             })
+
             saved = true
             setTimeout(() => {
                 saved = false
@@ -134,8 +141,10 @@
                 <span>{t("commands-weather-city-label")}</span>
             </div>
             <p class="section-hint">{t("commands-weather-city-hint")}</p>
-            <Input
-                placeholder={t("commands-weather-city-placeholder")}
+            <NativeSelect
+                data={WEATHER_CITIES.map((c) => ({ label: c.label, value: c.value }))}
+                label={t("commands-weather-city-label")}
+                variant="filled"
                 bind:value={weatherCity}
             />
         </section>
@@ -148,7 +157,8 @@
             <p class="section-hint">{t("commands-hint")}</p>
 
             <div class="phrase-add" role="group" on:keydown={handlePhraseKeydown}>
-                <Input
+                <input
+                    class="phrase-input"
                     placeholder={t("commands-phrase-placeholder-weather")}
                     bind:value={newPhrase}
                 />
@@ -187,4 +197,14 @@
 
 <style lang="scss">
     @use "../../../css/builtin-command-page.scss";
+
+    .phrase-input {
+        flex: 1;
+        padding: 0.65rem 0.75rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(8, 16, 20, 0.85);
+        color: #fff;
+        font-size: 0.85rem;
+    }
 </style>

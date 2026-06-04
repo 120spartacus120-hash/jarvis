@@ -28,6 +28,17 @@ pub struct UserCommand {
     pub user_line: String,
     #[serde(default)]
     pub jarvis_line: String,
+    #[serde(default = "default_volume_percent")]
+    pub volume_percent: u32,
+    /// Legacy fields — read for migration, not written back.
+    #[serde(default, skip_serializing)]
+    pub volume_up_steps: u32,
+    #[serde(default, skip_serializing)]
+    pub volume_down_steps: u32,
+    #[serde(default)]
+    pub volume_up_phrases: Vec<String>,
+    #[serde(default)]
+    pub volume_down_phrases: Vec<String>,
 }
 
 fn default_open_program() -> String {
@@ -44,6 +55,30 @@ pub struct CustomCommandsConfig {
     pub weather_phrases: Vec<String>,
     #[serde(default)]
     pub user_commands: Vec<UserCommand>,
+}
+
+fn default_volume_percent() -> u32 {
+    2
+}
+
+fn normalize_volume_percent(percent: u32) -> u32 {
+    let mut p = if percent == 0 { 2 } else { percent.clamp(2, 100) };
+    if p % 2 != 0 {
+        p += 1;
+    }
+    p.min(100)
+}
+
+fn migrate_volume_percent(cmd: &mut UserCommand) {
+    if cmd.volume_up_steps > 0 || cmd.volume_down_steps > 0 {
+        let legacy = cmd.volume_up_steps.max(cmd.volume_down_steps);
+        if cmd.volume_percent == 0 || legacy > cmd.volume_percent {
+            cmd.volume_percent = legacy;
+        }
+    }
+    cmd.volume_percent = normalize_volume_percent(cmd.volume_percent);
+    cmd.volume_up_steps = 0;
+    cmd.volume_down_steps = 0;
 }
 
 fn default_thanks_phrases() -> Vec<String> {
@@ -68,7 +103,33 @@ fn default_shutdown_phrases() -> Vec<String> {
     ]
 }
 
+/// Phrases used to detect today vs tomorrow (includes defaults if user removed them).
+pub fn weather_phrases_for_day_detect() -> Vec<String> {
+    let config = load();
+    let mut phrases = config.weather_phrases.clone();
+    let has_tomorrow = phrases.iter().any(|p| p.contains("завтра"));
+    let has_today = phrases.iter().any(|p| p.contains("сегодня"));
+
+    if !has_tomorrow || !has_today {
+        for p in default_weather_phrases() {
+            let need = (p.contains("завтра") && !has_tomorrow)
+                || (p.contains("сегодня") && !has_today);
+            if need && !phrases.iter().any(|x| x == &p) {
+                phrases.push(p);
+            }
+        }
+    }
+
+    phrases
+}
+
 fn default_weather_phrases() -> Vec<String> {
+    let mut phrases = default_weather_today_phrases();
+    phrases.extend(default_weather_tomorrow_phrases());
+    phrases
+}
+
+fn default_weather_today_phrases() -> Vec<String> {
     vec![
         "какая погода".into(),
         "какая сегодня погода".into(),
@@ -79,6 +140,42 @@ fn default_weather_phrases() -> Vec<String> {
         "скажи погоду".into(),
         "узнай погоду".into(),
     ]
+}
+
+fn default_weather_tomorrow_phrases() -> Vec<String> {
+    vec![
+        "какая погода завтра".into(),
+        "погода на завтра".into(),
+        "погода завтра".into(),
+        "прогноз на завтра".into(),
+        "погода завтрашнего дня".into(),
+    ]
+}
+
+fn split_weather_phrases(phrases: &[String]) -> (Vec<String>, Vec<String>) {
+    let mut today = Vec::new();
+    let mut tomorrow = Vec::new();
+
+    for p in phrases {
+        let s = p.trim().to_lowercase();
+        if s.is_empty() {
+            continue;
+        }
+        if s.contains("завтра") && !s.contains("послезавтра") {
+            tomorrow.push(s);
+        } else {
+            today.push(s);
+        }
+    }
+
+    if today.is_empty() {
+        today = default_weather_today_phrases();
+    }
+    if tomorrow.is_empty() {
+        tomorrow = default_weather_tomorrow_phrases();
+    }
+
+    (today, tomorrow)
 }
 
 impl Default for CustomCommandsConfig {
@@ -193,7 +290,7 @@ pub fn save(config: &CustomCommandsConfig) -> Result<(), String> {
 }
 
 pub fn commands_count(config: &CustomCommandsConfig) -> usize {
-    3 + normalize_config(config.clone()).user_commands.len()
+    4 + normalize_config(config.clone()).user_commands.len()
 }
 
 fn normalize_phrases(phrases: Vec<String>, fallback: fn() -> Vec<String>) -> Vec<String> {
@@ -237,6 +334,21 @@ pub fn normalize_config(mut config: CustomCommandsConfig) -> CustomCommandsConfi
 
             cmd.user_line = cmd.user_line.trim().to_lowercase();
             cmd.jarvis_line = cmd.jarvis_line.trim().to_string();
+            if cmd.command_type.as_str() == "volume_control" {
+                migrate_volume_percent(&mut cmd);
+            }
+            cmd.volume_up_phrases = cmd
+                .volume_up_phrases
+                .into_iter()
+                .map(|p| p.trim().to_lowercase())
+                .filter(|p| !p.is_empty())
+                .collect();
+            cmd.volume_down_phrases = cmd
+                .volume_down_phrases
+                .into_iter()
+                .map(|p| p.trim().to_lowercase())
+                .filter(|p| !p.is_empty())
+                .collect();
 
             if cmd.id.is_empty() || cmd.name.is_empty() {
                 return None;
@@ -260,6 +372,11 @@ pub fn normalize_config(mut config: CustomCommandsConfig) -> CustomCommandsConfi
                         cmd.website_url = normalize_website_url(&cmd.website_url);
                     }
                     if cmd.website_url.is_empty() {
+                        return None;
+                    }
+                }
+                "volume_control" => {
+                    if cmd.volume_up_phrases.is_empty() && cmd.volume_down_phrases.is_empty() {
                         return None;
                     }
                 }
@@ -453,15 +570,17 @@ pub fn to_commands_list(config: &CustomCommandsConfig) -> Vec<JCommandsList> {
         String::new(),
         String::new(),
         0,
-        sound_map(&lang, &["off", "ok1"]),
+        sound_map(&lang, &["off"]),
         phrase_map(&lang, &config.shutdown_phrases),
         HashMap::new(),
     ));
 
+    let (weather_today, weather_tomorrow) = split_weather_phrases(&config.weather_phrases);
+
     commands.push(JCommand::new(
         "builtin_weather".into(),
         "weather".into(),
-        "Погода".into(),
+        "Погода сегодня".into(),
         String::new(),
         vec![],
         String::new(),
@@ -470,7 +589,23 @@ pub fn to_commands_list(config: &CustomCommandsConfig) -> Vec<JCommandsList> {
         String::new(),
         0,
         HashMap::new(),
-        phrase_map(&lang, &config.weather_phrases),
+        phrase_map(&lang, &weather_today),
+        HashMap::new(),
+    ));
+
+    commands.push(JCommand::new(
+        "builtin_weather_tomorrow".into(),
+        "weather".into(),
+        "Погода завтра".into(),
+        String::new(),
+        vec![],
+        String::new(),
+        vec![],
+        String::new(),
+        String::new(),
+        0,
+        HashMap::new(),
+        phrase_map(&lang, &weather_tomorrow),
         HashMap::new(),
     ));
 
@@ -520,6 +655,46 @@ pub fn to_commands_list(config: &CustomCommandsConfig) -> Vec<JCommandsList> {
                     phrase_map(&lang, &user_cmd.phrases),
                     HashMap::new(),
                 ));
+            }
+            "volume_control" => {
+                let response = user_cmd.jarvis_line.clone();
+                let sounds = sounds_for_response(&response, &lang);
+
+                if !user_cmd.volume_up_phrases.is_empty() {
+                    commands.push(JCommand::new(
+                        format!("{}__up", user_cmd.id),
+                        "volume_change".into(),
+                        command_description(user_cmd),
+                        String::new(),
+                        vec![user_cmd.volume_percent.to_string()],
+                        "up".into(),
+                        vec![],
+                        response.clone(),
+                        String::new(),
+                        0,
+                        sounds.clone(),
+                        phrase_map(&lang, &user_cmd.volume_up_phrases),
+                        HashMap::new(),
+                    ));
+                }
+
+                if !user_cmd.volume_down_phrases.is_empty() {
+                    commands.push(JCommand::new(
+                        format!("{}__down", user_cmd.id),
+                        "volume_change".into(),
+                        command_description(user_cmd),
+                        String::new(),
+                        vec![user_cmd.volume_percent.to_string()],
+                        "down".into(),
+                        vec![],
+                        response.clone(),
+                        String::new(),
+                        0,
+                        sounds,
+                        phrase_map(&lang, &user_cmd.volume_down_phrases),
+                        HashMap::new(),
+                    ));
+                }
             }
             _ => {}
         }
@@ -621,3 +796,4 @@ pub fn launch_website(url: &str) -> Result<(), String> {
 
     Ok(())
 }
+

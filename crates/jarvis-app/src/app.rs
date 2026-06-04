@@ -404,9 +404,12 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
     // «погода сегодня» и похожие фразы — всегда команда погоды (Vosk часто меняет порядок слов)
     if is_weather_phrase(&text) {
         if let Some((cmd_path, cmd_config)) =
-            commands::get_command_by_id(&commands_list, "builtin_weather")
+            commands::fetch_weather_command(&text, &commands_list)
         {
-            info!("Weather phrase detected: {}", text);
+            info!(
+                "Weather phrase detected: '{}' -> {}",
+                text, cmd_config.id
+            );
             return finish_command_execution(&cmd_path, &cmd_config, &text, None);
         }
     }

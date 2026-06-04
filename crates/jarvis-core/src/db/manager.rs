@@ -75,6 +75,13 @@ impl SettingsManager {
         &self.inner
     }
 
+    /// Reload from disk (same file as jarvis-app `DB` when using `settings.arc()`).
+    pub fn reload_from_disk(&self) -> Result<(), String> {
+        let fresh = super::init_settings();
+        *self.inner.write() = fresh;
+        Ok(())
+    }
+
     // dump all settings as key-value pairs (for debugging)
     pub fn dump(&self) -> Vec<(String, String)> {
         let settings = self.inner.read();

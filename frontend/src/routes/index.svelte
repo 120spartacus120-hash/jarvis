@@ -9,8 +9,6 @@
     import {
         isJarvisRunning,
         updateJarvisStats,
-        enableIpc,
-        disableIpc,
         translate,
         translations,
         jarvisState,
@@ -25,8 +23,6 @@
     let processRunning = false
     let launching = false
     let startError = ""
-    let wasRunning = false
-
     $: statusKey =
         $jarvisState === "listening"
             ? "status-listening"
@@ -42,21 +38,10 @@
 
     isJarvisRunning.subscribe((value) => {
         processRunning = value
-        if (value) {
-            enableIpc()
-            wasRunning = true
-        } else if (wasRunning) {
-            disableIpc()
-            wasRunning = false
-        }
     })
 
     onMount(() => {
         updateJarvisStats()
-    })
-
-    onDestroy(() => {
-        disableIpc()
     })
 
     async function runAssistant() {

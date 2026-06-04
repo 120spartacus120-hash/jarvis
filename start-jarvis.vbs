@@ -15,9 +15,9 @@ If Not fso.FileExists(exePath) Then
 End If
 
 If Not fso.FileExists(exePath) Then
-    MsgBox "JARVIS eshche ne sobran." & vbCrLf & vbCrLf & _
-        "Zapustite v papke proekta:" & vbCrLf & _
-        "Sobrat JARVIS.bat", vbCritical, "JARVIS"
+    MsgBox "JARVIS ещё не собран." & vbCrLf & vbCrLf & _
+        "Запустите в папке проекта:" & vbCrLf & _
+        "► СОБРАТЬ JARVIS.bat", vbCritical, "JARVIS"
     WScript.Quit 1
 End If
 
@@ -28,9 +28,10 @@ If fso.FileExists(indexPath) Then
     Set indexFile = fso.GetFile(indexPath)
     If indexFile.DateLastModified > exeFile.DateLastModified Then
         answer = MsgBox( _
-            "Interfeys obnovlen, programma eshche ne peresobrana." & vbCrLf & vbCrLf & _
-            "Rekomenduetsya: Sobrat JARVIS.bat" & vbCrLf & vbCrLf & _
-            "Zapustit JARVIS seychas bez peresborki?", _
+            "Интерфейс обновлён, а jarvis-gui.exe ещё старый." & vbCrLf & vbCrLf & _
+            "Чтобы увидеть выбор городов (Москва, Челябинск, Якутск), нажмите «Нет» и запустите:" & vbCrLf & _
+            "► СОБРАТЬ JARVIS.bat" & vbCrLf & vbCrLf & _
+            "Запустить старую версию сейчас?", _
             vbYesNo + vbExclamation, "JARVIS")
         If answer = vbNo Then WScript.Quit 0
     End If
@@ -43,4 +44,4 @@ If Err.Number <> 0 Then
 End If
 
 shell.CurrentDirectory = "J:\"
-shell.Run """J:\jarvis-gui.exe""", 1, False
+shell.Run """J:\jarvis-gui.exe""", 0, False

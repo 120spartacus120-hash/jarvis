@@ -16,7 +16,8 @@ export {
     sendIpcMessage,
     sendTextCommand,
     stopJarvisApp,
-    reloadCommands
+    reloadCommands,
+    reloadSettings,
 } from "./lib/ipc"
 
 // re-export i18n

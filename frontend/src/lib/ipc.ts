@@ -159,6 +159,21 @@ export function reloadCommands() {
     return sendAction("reload_commands")
 }
 
+/** Push settings.json into jarvis-app immediately (jarvis-app also watches the file). */
+export async function reloadSettings(attempts = 6): Promise<boolean> {
+    for (let i = 0; i < attempts; i++) {
+        if (sendAction("reload_settings")) {
+            return true
+        }
+        if (!get(ipcConnected) && i === 0) {
+            enableIpc()
+        }
+        await new Promise((r) => setTimeout(r, 300))
+    }
+    console.warn("[IPC] reload_settings: assistant not connected (file watcher will apply soon)")
+    return false
+}
+
 export function sendIpcMessage(message: object): Promise<void> {
     return new Promise((resolve, reject) => {
         if (!ws || ws.readyState !== WebSocket.OPEN) {

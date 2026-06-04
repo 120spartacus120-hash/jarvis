@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::time::Duration;
@@ -162,6 +163,86 @@ pub fn fetch_command<'a>(
     result
 }
 
+/// Pick today vs tomorrow weather command by phrase (not always `builtin_weather`).
+#[cfg(feature = "jarvis_app")]
+pub fn fetch_weather_command<'a>(
+    phrase: &str,
+    commands: &'a [JCommandsList],
+) -> Option<(&'a PathBuf, &'a JCommand)> {
+    let phrase = crate::speech_normalize::normalize(&phrase.trim().to_lowercase());
+    if phrase.is_empty() {
+        return None;
+    }
+
+    if crate::weather::is_tomorrow_request(&phrase) {
+        if let Some(found) = get_command_by_id(commands, "builtin_weather_tomorrow") {
+            info!("Weather: tomorrow request detected in '{}'", phrase);
+            return Some(found);
+        }
+    }
+
+    if phrase.split_whitespace().any(|w| {
+        let t = w.trim_matches(|c: char| !c.is_alphanumeric());
+        t == "сегодня" || t.starts_with("сегодн")
+    }) {
+        if let Some(found) = get_command_by_id(commands, "builtin_weather") {
+            info!("Weather: today request detected in '{}'", phrase);
+            return Some(found);
+        }
+    }
+
+    let phrase_chars: Vec<char> = phrase.chars().collect();
+    let phrase_words: Vec<&str> = phrase.split_whitespace().collect();
+    let lang = i18n::get_language();
+
+    let mut result: Option<(&PathBuf, &JCommand)> = None;
+    let mut best_score = config::CMD_RATIO_THRESHOLD;
+
+    for cmd_list in commands {
+        for cmd in &cmd_list.commands {
+            if cmd.cmd_type != "weather" {
+                continue;
+            }
+
+            let cmd_phrases = cmd.get_phrases(&lang);
+            for cmd_phrase in cmd_phrases.iter() {
+                let cmd_phrase_lower = cmd_phrase.trim().to_lowercase();
+                let cmd_phrase_chars: Vec<char> = cmd_phrase_lower.chars().collect();
+                let char_ratio = ratio(&phrase_chars, &cmd_phrase_chars);
+                let cmd_words: Vec<&str> = cmd_phrase_lower.split_whitespace().collect();
+                let word_score = word_overlap_score(&phrase_words, &cmd_words);
+                let mut score = (char_ratio * 0.6) + (word_score * 0.4);
+
+                if cmd.id == "builtin_weather_tomorrow" && cmd_phrase_lower.contains("завтра") {
+                    score += 8.0;
+                }
+
+                if score >= 99.0 {
+                    info!(
+                        "Weather match: '{}' -> '{}' ({})",
+                        phrase, cmd_phrase_lower, cmd.id
+                    );
+                    return Some((&cmd_list.path, cmd));
+                }
+
+                if score > best_score {
+                    best_score = score;
+                    result = Some((&cmd_list.path, cmd));
+                }
+            }
+        }
+    }
+
+    if let Some((_, cmd)) = result {
+        info!(
+            "Weather fuzzy: '{}' -> {} (score: {:.1}%)",
+            phrase, cmd.id, best_score
+        );
+    }
+
+    result.or_else(|| get_command_by_id(commands, "builtin_weather"))
+}
+
 
 fn word_overlap_score(input_words: &[&str], cmd_words: &[&str]) -> f64 {
     if input_words.is_empty() || cmd_words.is_empty() {
@@ -198,6 +279,134 @@ fn word_overlap_score(input_words: &[&str], cmd_words: &[&str]) -> f64 {
 
 pub fn execute_exe(exe: &str, args: &[String]) -> std::io::Result<Child> {
     Command::new(exe).args(args).spawn()
+}
+
+/// Resolve AHK script path: config may say `.exe` while repo ships `.ahk`.
+fn resolve_ahk_script_path(cmd_path: &Path, exe_path_config: &str) -> PathBuf {
+    let absolute = Path::new(exe_path_config);
+    if absolute.is_absolute() && absolute.exists() {
+        return absolute.to_path_buf();
+    }
+
+    let local = cmd_path.join(exe_path_config);
+    if local.exists() {
+        return local;
+    }
+
+    if exe_path_config.ends_with(".exe") {
+        let ahk = cmd_path.join(exe_path_config.replace(".exe", ".ahk"));
+        if ahk.exists() {
+            return ahk;
+        }
+    }
+
+    local
+}
+
+#[cfg(target_os = "windows")]
+fn find_autohotkey_executable() -> Option<PathBuf> {
+    let candidates = [
+        PathBuf::from(r"C:\Program Files\AutoHotkey\AutoHotkey.exe"),
+        PathBuf::from(r"C:\Program Files\AutoHotkey\v1.1.37.02\AutoHotkeyU64.exe"),
+        PathBuf::from(r"C:\Program Files\AutoHotkey\v1.1.37.02\AutoHotkeyA32.exe"),
+        PathBuf::from(r"C:\Program Files\AutoHotkey\UX\AutoHotkeyUX.exe"),
+    ];
+
+    for path in candidates {
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+
+    std::env::var_os("PATH").and_then(|paths| {
+        std::env::split_paths(&paths).find_map(|dir| {
+            let exe = dir.join("AutoHotkey.exe");
+            if exe.is_file() {
+                Some(exe)
+            } else {
+                None
+            }
+        })
+    })
+}
+
+/// Fallback when AutoHotkey is not installed: emulate media keys via PowerShell.
+#[cfg(target_os = "windows")]
+fn send_volume_media_key(vk: u8, presses: u32) -> Result<(), String> {
+    let ps = format!(
+        r#"$s='[DllImport("user32.dll")]public static extern void keybd_event(byte bVk,byte bScan,uint dwFlags,int dwExtraInfo);'; Add-Type -MemberDefinition $s -Name W -Namespace D; 1..{presses} | %{{ [D.W]::keybd_event({vk},0,0,0); [D.W]::keybd_event({vk},0,2,0) }}"#,
+        presses = presses,
+        vk = vk
+    );
+
+    Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            &ps,
+        ])
+        .spawn()
+        .map_err(|e| format!("Volume media key error: {}", e))?;
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn spawn_ahk_script(script_path: &Path, args: &[String]) -> Result<(), String> {
+    const VK_VOLUME_MUTE: u8 = 0xAD;
+    const VK_VOLUME_DOWN: u8 = 0xAE;
+    const VK_VOLUME_UP: u8 = 0xAF;
+
+    if script_path.extension() == Some(OsStr::new("exe")) && script_path.is_file() {
+        execute_exe(
+            script_path.to_str().ok_or("Invalid AHK exe path")?,
+            args,
+        )
+        .map_err(|e| format!("AHK process spawn error: {}", e))?;
+        return Ok(());
+    }
+
+    if script_path.extension() == Some(OsStr::new("ahk")) && script_path.is_file() {
+        if let Some(ahk) = find_autohotkey_executable() {
+            let mut cmd = Command::new(ahk);
+            cmd.arg(script_path);
+            cmd.args(args);
+            cmd.spawn()
+                .map_err(|e| format!("AutoHotkey spawn error: {}", e))?;
+            return Ok(());
+        }
+
+        let name = script_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        if name.contains("volume up") {
+            return send_volume_media_key(VK_VOLUME_UP, 2);
+        }
+        if name.contains("volume down") {
+            return send_volume_media_key(VK_VOLUME_DOWN, 2);
+        }
+        if name.contains("mute") {
+            return send_volume_media_key(VK_VOLUME_MUTE, 1);
+        }
+
+        return Err(format!(
+            "AutoHotkey not found for {}. Install AutoHotkey v1 (volume up/down work without it).",
+            script_path.display()
+        ));
+    }
+
+    Err(format!("AHK script not found: {}", script_path.display()))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn spawn_ahk_script(_script_path: &Path, _args: &[String]) -> Result<(), String> {
+    Err("AHK commands are only supported on Windows.".into())
 }
 
 pub fn execute_cli(cmd: &str, args: &[String]) -> std::io::Result<Child> {
@@ -238,21 +447,10 @@ pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option
             execute_lua_command(cmd_path, cmd_config, phrase, slots)
         }
 
-        // AutoHotkey command
-        // @TODO: Consider adding ahk source files execution?
+        // AutoHotkey command (.exe or .ahk; PowerShell fallback for volume keys)
         "ahk" => {
-            let exe_path_absolute = Path::new(&cmd_config.exe_path);
-            let exe_path_local = cmd_path.join(&cmd_config.exe_path);
-
-            let exe_path = if exe_path_absolute.exists() {
-                exe_path_absolute
-            } else {
-                exe_path_local.as_path()
-            };
-
-            execute_exe(exe_path.to_str().unwrap(), &cmd_config.exe_args)
-                .map(|_| true)
-                .map_err(|e| format!("AHK process spawn error: {}", e))
+            let script_path = resolve_ahk_script_path(cmd_path, &cmd_config.exe_path);
+            spawn_ahk_script(&script_path, &cmd_config.exe_args).map(|_| true)
         }
         
         // CLI command type
@@ -266,12 +464,41 @@ pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option
         // TERMINATOR command (T1000) — exit is handled in jarvis-app after voice reply
         "terminate" => Ok(true),
         
+        "volume_change" => {
+            #[cfg(target_os = "windows")]
+            {
+                const VK_VOLUME_UP: u8 = 0xAF;
+                const VK_VOLUME_DOWN: u8 = 0xAE;
+                let percent = cmd_config
+                    .exe_args
+                    .first()
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .unwrap_or(2)
+                    .clamp(1, 100);
+                
+                // 1 media key press = 2% volume change in Windows
+                let presses = (percent as f32 / 2.0).ceil() as u32;
+                
+                match cmd_config.cli_cmd.as_str() {
+                    // Ok(false): do not chain — STT may re-recognize the same phrase and run twice.
+                    "up" => send_volume_media_key(VK_VOLUME_UP, presses).map(|_| false),
+                    "down" => send_volume_media_key(VK_VOLUME_DOWN, presses).map(|_| false),
+                    other => Err(format!("Unknown volume direction: {}", other)),
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                Err("Volume commands are only supported on Windows.".into())
+            }
+        }
+
         #[cfg(feature = "jarvis_app")]
         "weather" => {
+            let day = crate::weather::day_for_command(&cmd_config.id, phrase);
             crate::weather::play_intro();
-            match crate::weather::get_weather() {
+            match crate::weather::get_weather(day) {
                 Ok(playlist) => {
-                    crate::weather::play_today_intro();
+                    crate::weather::play_day_intro(day);
                     if playlist.is_empty() {
                         crate::voices::play_error();
                     } else {
