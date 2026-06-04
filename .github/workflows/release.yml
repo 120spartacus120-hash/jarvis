@@ -77,6 +77,40 @@ jobs:
           }
           $manifest | ConvertTo-Json -Depth 5 | Set-Content "$nsisDir/latest.json" -Encoding utf8
 
+      - name: Resolve release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $ver = $tag -replace '^v',''
+          $out = "release-notes-body.md"
+          $candidates = @(
+            "resources/release-notes/$tag.md",
+            "resources/release-notes/v$ver.md",
+            "resources/release-notes/RELEASE_BODY.md"
+          )
+          $found = $false
+          foreach ($path in $candidates) {
+            if (Test-Path -LiteralPath $path) {
+              Copy-Item -LiteralPath $path -Destination $out -Force
+              Write-Host "Using release notes: $path"
+              $found = $true
+              break
+            }
+          }
+          if (-not $found) {
+            @"
+          ## JARVIS $tag
+
+          См. коммиты в репозитории.
+
+          ---
+
+          Установите обновление кнопкой **«Обновить»** в программе или скачайте установщик ниже.
+          "@ | Set-Content -Path $out -Encoding utf8
+          }
+          "path=$out" >> $env:GITHUB_OUTPUT
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         env:
@@ -84,9 +118,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: JARVIS ${{ github.ref_name }}
-          body: |
-            Установите обновление кнопкой «Обновить» в программе
-            или скачайте установщик ниже.
+          body_path: ${{ steps.notes.outputs.path }}
           draft: false
           prerelease: false
           files: |
