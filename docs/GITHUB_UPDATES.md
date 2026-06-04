@@ -21,6 +21,15 @@ git branch -M main
 git push -u origin main
 ```
 
+## Важно: два вида подписи
+
+| Что | Зачем | Убирает «вирус» при установке? |
+|-----|--------|--------------------------------|
+| **TAURI_SIGNING_PRIVATE_KEY** (minisign) | Кнопка «Обновить» в программе | **Нет** |
+| **Code Signing .pfx** (Authenticode) | Подпись `*-setup.exe` | **Да** (после репутации) |
+
+Подробно: `docs/УСТАНОВКА_И_ДОВЕРИЕ_WINDOWS.md`
+
 ## 2. Секрет для подписи обновлений
 
 1. Открой репозиторий → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**

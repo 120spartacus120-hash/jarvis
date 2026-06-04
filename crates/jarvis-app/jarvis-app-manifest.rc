@@ -1,2 +1,5 @@
 #define RT_MANIFEST 24
 1 RT_MANIFEST "jarvis-app-manifest.xml"
+
+// Tray / taskbar icon for jarvis-app.exe
+1 ICON "../../resources/icons/icon.ico"

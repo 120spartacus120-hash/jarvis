@@ -47,6 +47,9 @@ pub enum IpcAction {
     
     // Reload commands from disk
     ReloadCommands,
+
+    /// Reload settings.json into jarvis-app (after GUI saved weather city, etc.)
+    ReloadSettings,
     
     // Ping to check connection
     Ping,

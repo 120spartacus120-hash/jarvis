@@ -2,6 +2,7 @@ fn main() {
     if cfg!(target_os = "windows") {
         println!("cargo:rerun-if-changed=jarvis-app-manifest.rc");
         println!("cargo:rerun-if-changed=jarvis-app-manifest.xml");
+        println!("cargo:rerun-if-changed=../../resources/icons/icon.ico");
 
         embed_resource::compile("jarvis-app-manifest.rc", embed_resource::NONE)
             .manifest_required()

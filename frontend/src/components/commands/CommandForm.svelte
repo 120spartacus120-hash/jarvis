@@ -14,6 +14,10 @@
         normalizeWebsiteUrl,
         isValidWebsiteUrl,
         newCommandId,
+        normalizeVolumePercent,
+        resolveVolumePercent,
+        DEFAULT_VOLUME_UP_PHRASES,
+        DEFAULT_VOLUME_DOWN_PHRASES,
         type CustomCommandsConfig,
         type CommandType,
         type UserCommand,
@@ -37,7 +41,12 @@
     let programPath = ""
     let websiteUrl = ""
     let phrases: string[] = []
+    let upPhrases: string[] = []
+    let downPhrases: string[] = []
+    let volumePercent = 2
     let newPhrase = ""
+    let newUpPhrase = ""
+    let newDownPhrase = ""
     let loading = true
     let saving = false
     let saved = false
@@ -46,14 +55,27 @@
     let loadedKey = ""
     let previousType = ""
 
-    $: if (!isEdit && commandType && previousType && previousType !== commandType) {
-        name = ""
-        programPath = ""
-        websiteUrl = ""
-        phrases = []
-        newPhrase = ""
+    $: if (!isEdit && commandType && commandType !== previousType) {
+        if (previousType) {
+            name = ""
+            programPath = ""
+            websiteUrl = ""
+            phrases = []
+            newPhrase = ""
+            newUpPhrase = ""
+            newDownPhrase = ""
+        }
+        upPhrases = []
+        downPhrases = []
+        volumePercent = 2
+        if (commandType === "volume_control") {
+            upPhrases = [...DEFAULT_VOLUME_UP_PHRASES]
+            downPhrases = [...DEFAULT_VOLUME_DOWN_PHRASES]
+        }
+        previousType = commandType
     }
-    $: previousType = commandType
+
+    $: volumePercentPreview = normalizeVolumePercent(volumePercent)
 
     async function loadForm() {
         const key = `${mode}:${commandId}`
@@ -69,7 +91,9 @@
                 const existing = config.user_commands.find((cmd) => cmd.id === commandId)
                 if (
                     !existing ||
-                    (existing.type !== "open_program" && existing.type !== "open_website")
+                    (existing.type !== "open_program" &&
+                        existing.type !== "open_website" &&
+                        existing.type !== "volume_control")
                 ) {
                     loadError = t("error-not-found")
                     return
@@ -81,12 +105,18 @@
                     existing.website_url?.trim() ||
                     (existing.type === "open_website" ? existing.program_path ?? "" : "")
                 phrases = [...(existing.phrases ?? [])]
+                upPhrases = [...(existing.volume_up_phrases ?? [])]
+                downPhrases = [...(existing.volume_down_phrases ?? [])]
+                volumePercent = resolveVolumePercent(existing)
             } else {
                 commandType = ""
                 name = ""
                 programPath = ""
                 websiteUrl = ""
                 phrases = []
+                upPhrases = []
+                downPhrases = []
+                volumePercent = 2
             }
 
             loadedKey = key
@@ -133,6 +163,15 @@
             }
         }
 
+        if (commandType === "volume_control") {
+            const normalizedUp = normalizePhrases(upPhrases)
+            const normalizedDown = normalizePhrases(downPhrases)
+            if (normalizedUp.length === 0 && normalizedDown.length === 0) {
+                saveError = t("commands-volume-phrases-required")
+                return
+            }
+        }
+
         const normalizedPhrases = normalizePhrases(phrases)
 
         const userCommand: UserCommand = {
@@ -142,9 +181,15 @@
             program_path: commandType === "open_program" ? programPath.trim() : "",
             website_url:
                 commandType === "open_website" ? normalizeWebsiteUrl(websiteUrl) : "",
-            phrases: normalizedPhrases,
+            phrases: commandType === "volume_control" ? [] : normalizedPhrases,
             user_line: "",
             jarvis_line: "",
+            volume_percent:
+                commandType === "volume_control" ? normalizeVolumePercent(volumePercent) : undefined,
+            volume_up_phrases:
+                commandType === "volume_control" ? normalizePhrases(upPhrases) : undefined,
+            volume_down_phrases:
+                commandType === "volume_control" ? normalizePhrases(downPhrases) : undefined,
         }
 
         saving = true
@@ -213,6 +258,48 @@
         if (event.key === "Enter") {
             event.preventDefault()
             addPhrase()
+        }
+    }
+
+    function addVolumePhrase(list: "up" | "down") {
+        if (list === "up") {
+            const phrase = newUpPhrase.trim().toLowerCase()
+            if (!phrase || upPhrases.includes(phrase)) {
+                newUpPhrase = ""
+                return
+            }
+            upPhrases = [...upPhrases, phrase]
+            newUpPhrase = ""
+            return
+        }
+        const phrase = newDownPhrase.trim().toLowerCase()
+        if (!phrase || downPhrases.includes(phrase)) {
+            newDownPhrase = ""
+            return
+        }
+        downPhrases = [...downPhrases, phrase]
+        newDownPhrase = ""
+    }
+
+    function removeVolumePhrase(list: "up" | "down", index: number) {
+        if (list === "up") {
+            upPhrases = upPhrases.filter((_, i) => i !== index)
+        } else {
+            downPhrases = downPhrases.filter((_, i) => i !== index)
+        }
+    }
+
+    function handleUpPhraseKeydown(event: KeyboardEvent) {
+        if (event.key === "Enter") {
+            event.preventDefault()
+            addVolumePhrase("up")
+        }
+    }
+
+    function handleDownPhraseKeydown(event: KeyboardEvent) {
+        if (event.key === "Enter") {
+            event.preventDefault()
+            addVolumePhrase("down")
         }
     }
 
@@ -316,6 +403,113 @@
                             placeholder="https://yandex.ru"
                             bind:value={websiteUrl}
                         />
+                    </section>
+                {:else if commandType === "volume_control"}
+                    <section class="form-section">
+                        <div class="section-label">
+                            <span class="step">3</span>
+                            <span>{t("commands-volume-steps-title")}</span>
+                        </div>
+                        <p class="section-hint">{t("commands-volume-steps-hint")}</p>
+                        <div class="volume-percent-row">
+                            <label class="percent-field">
+                                <span>{t("commands-volume-percent-label")}</span>
+                                <Input
+                                    type="number"
+                                    min={2}
+                                    max={100}
+                                    step={2}
+                                    bind:value={volumePercent}
+                                />
+                            </label>
+                            <div class="volume-preview" aria-live="polite">
+                                <span class="preview-title">{t("commands-volume-preview-title")}</span>
+                                <div class="preview-lines">
+                                    <span class="preview-up">
+                                        {t("commands-volume-preview-up", { percent: volumePercentPreview })}
+                                    </span>
+                                    <span class="preview-down">
+                                        {t("commands-volume-preview-down", { percent: volumePercentPreview })}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                {/if}
+
+                {#if commandType === "volume_control"}
+                    <section class="form-section">
+                        <div class="section-label">
+                            <span class="step">4</span>
+                            <span>{t("commands-volume-up-phrases-title")}</span>
+                        </div>
+                        <p class="section-hint">{t("commands-volume-up-hint")}</p>
+                        <div class="phrase-add" role="group" on:keydown={handleUpPhraseKeydown}>
+                            <Input
+                                placeholder={t("commands-phrase-placeholder-volume-up")}
+                                bind:value={newUpPhrase}
+                            />
+                            <Button on:click={() => addVolumePhrase("up")} disabled={!newUpPhrase.trim()}>
+                                <Plus size={14} />
+                                {t("commands-add-phrase")}
+                            </Button>
+                        </div>
+                        {#if upPhrases.length === 0}
+                            <p class="empty-phrases">{t("commands-no-phrases")}</p>
+                        {:else}
+                            <ul class="phrase-list">
+                                {#each upPhrases as phrase, index}
+                                    <li>
+                                        <span>{phrase}</span>
+                                        <button
+                                            type="button"
+                                            class="remove-btn"
+                                            on:click={() => removeVolumePhrase("up", index)}
+                                            title={t("commands-remove-phrase")}
+                                        >
+                                            <Trash size={14} />
+                                        </button>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                    </section>
+
+                    <section class="form-section">
+                        <div class="section-label">
+                            <span class="step">5</span>
+                            <span>{t("commands-volume-down-phrases-title")}</span>
+                        </div>
+                        <p class="section-hint">{t("commands-volume-down-hint")}</p>
+                        <div class="phrase-add" role="group" on:keydown={handleDownPhraseKeydown}>
+                            <Input
+                                placeholder={t("commands-phrase-placeholder-volume-down")}
+                                bind:value={newDownPhrase}
+                            />
+                            <Button on:click={() => addVolumePhrase("down")} disabled={!newDownPhrase.trim()}>
+                                <Plus size={14} />
+                                {t("commands-add-phrase")}
+                            </Button>
+                        </div>
+                        {#if downPhrases.length === 0}
+                            <p class="empty-phrases">{t("commands-no-phrases")}</p>
+                        {:else}
+                            <ul class="phrase-list">
+                                {#each downPhrases as phrase, index}
+                                    <li>
+                                        <span>{phrase}</span>
+                                        <button
+                                            type="button"
+                                            class="remove-btn"
+                                            on:click={() => removeVolumePhrase("down", index)}
+                                            title={t("commands-remove-phrase")}
+                                        >
+                                            <Trash size={14} />
+                                        </button>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
                     </section>
                 {/if}
 
@@ -463,6 +657,60 @@
         display: flex;
         flex-direction: column;
         gap: 0.55rem;
+    }
+
+    .volume-percent-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 1rem;
+        margin-top: 0.25rem;
+    }
+
+    .percent-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        min-width: 120px;
+        flex: 0 0 140px;
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.75);
+    }
+
+    .volume-preview {
+        flex: 1;
+        min-width: 180px;
+        padding: 0.75rem 0.9rem;
+        border-radius: 10px;
+        border: 1px solid rgba(82, 254, 254, 0.2);
+        background: rgba(8, 16, 20, 0.65);
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .preview-title {
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: rgba(255, 255, 255, 0.45);
+    }
+
+    .preview-lines {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+    }
+
+    .preview-up {
+        color: #8ac832;
+    }
+
+    .preview-down {
+        color: #52b4fe;
     }
 
     :global(.pick-btn) {

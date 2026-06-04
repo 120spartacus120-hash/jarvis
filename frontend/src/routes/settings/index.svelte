@@ -4,7 +4,8 @@
     import { goto } from "@roxi/routify"
     import { setTimeout } from "worker-timers"
 
-    import { assistantVoice, translations, translate } from "@/stores"
+    import { assistantVoice, translations, translate, reloadSettings } from "@/stores"
+    import { resolveWeatherCity, WEATHER_CITIES } from "@/lib/weatherCities"
 
     import {
         Notification,
@@ -113,8 +114,10 @@
 
                 invoke("db_write", { key: "api_key__picovoice", val: apiKeyPicovoice }),
                 invoke("db_write", { key: "api_key__openai", val: apiKeyOpenai }),
-                invoke("db_write", { key: "weather_city", val: weatherCity })
+                invoke("db_write", { key: "weather_city", val: resolveWeatherCity(weatherCity) }),
             ])
+
+            await reloadSettings()
 
             // update shared store
             assistantVoice.set(voiceVal)
@@ -210,7 +213,7 @@
             windowsAutostart = await invoke<boolean>("is_windows_autostart")
             apiKeyPicovoice = pico
             apiKeyOpenai = openai
-            weatherCity = weather_city_val
+            weatherCity = resolveWeatherCity(weather_city_val)
         } catch (err) {
             console.error("failed to load settings:", err)
         }
@@ -510,18 +513,14 @@
 
         <div class="tab-content" class:active={activeTab === 'weather'}>
             <div class="card">
-                <h3>Настройки погоды</h3>
-                <InputWrapper label="Город для погоды">
-                    <Text size="sm" color="gray">
-                        Введите название вашего города на русском языке (например: Москва, Санкт-Петербург).
-                    </Text>
-                    <Space h="xs" />
-                    <Input
-                        placeholder="Ваш город"
-                        variant="filled"
-                        bind:value={weatherCity}
-                    />
-                </InputWrapper>
+                <h3>{t("settings-weather-title")}</h3>
+                <NativeSelect
+                    data={WEATHER_CITIES.map((c) => ({ label: c.label, value: c.value }))}
+                    label={t("commands-weather-city-label")}
+                    description={t("commands-weather-city-hint")}
+                    variant="filled"
+                    bind:value={weatherCity}
+                />
             </div>
         </div>
     </div>

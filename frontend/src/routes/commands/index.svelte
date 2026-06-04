@@ -8,8 +8,10 @@
     import { translations, translate } from "@/stores"
     import {
         loadCustomCommands,
+        resolveVolumePercent,
         type CustomCommandsConfig,
     } from "@/lib/customCommands"
+    import { resolveWeatherCity, weatherCityLabel } from "@/lib/weatherCities"
 
     import { Button, Input } from "@svelteuidev/core"
     import { Plus, MagnifyingGlass } from "radix-icons-svelte"
@@ -66,7 +68,7 @@
     }
 
     function buildCards(config: CustomCommandsConfig, weatherCity: string): CommandCard[] {
-        const city = weatherCity.trim()
+        const city = weatherCityLabel(resolveWeatherCity(weatherCity))
         const weatherPhrases = config.weather_phrases?.length ?? 0
 
         const builtin: CommandCard[] = [
@@ -101,8 +103,33 @@
         ]
 
         const userCards: CommandCard[] = (config.user_commands ?? [])
-            .filter((cmd) => cmd.type === "open_program" || cmd.type === "open_website")
+            .filter(
+                (cmd) =>
+                    cmd.type === "open_program" ||
+                    cmd.type === "open_website" ||
+                    cmd.type === "volume_control"
+            )
             .map((cmd): CommandCard => {
+                if (cmd.type === "volume_control") {
+                    const percent = resolveVolumePercent(cmd)
+                    const phraseCount =
+                        (cmd.volume_up_phrases?.length ?? 0) +
+                        (cmd.volume_down_phrases?.length ?? 0)
+                    return {
+                        id: cmd.id,
+                        title: cmd.name,
+                        descKey: "commands-card-volume-user-desc",
+                        descArgs: { percent: String(percent) },
+                        route: "/commands/edit/[id]",
+                        routeParams: { id: cmd.id },
+                        phraseCount,
+                        configured:
+                            phraseCount > 0 &&
+                            Boolean(cmd.name?.trim()),
+                        builtin: false,
+                        typeLabelKey: "commands-type-volume-control",
+                    }
+                }
                 if (cmd.type === "open_website") {
                     const site =
                         cmd.website_url?.trim() ||
@@ -207,7 +234,7 @@
                             {#if card.builtin && card.descArgs?.city}
                                 {t("commands-card-weather-city", { city: card.descArgs.city })}
                             {:else if card.builtin && card.descKey}
-                                {t(card.descKey)}
+                                {t(card.descKey, card.descArgs)}
                             {:else if card.descArgs?.program}
                                 {t("commands-type-open-program")} · {card.descArgs.program}
                             {:else if card.descArgs?.site}
