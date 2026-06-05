@@ -1,6 +1,7 @@
 import { check, type Update } from "@tauri-apps/plugin-updater"
 import { relaunch } from "@tauri-apps/plugin-process"
 import { invoke } from "@tauri-apps/api/core"
+import { get, writable } from "svelte/store"
 import { stopJarvisApp, disableIpc, disconnectIpc } from "@/lib/ipc"
 
 export type UpdateInfo = {
@@ -9,32 +10,61 @@ export type UpdateInfo = {
     date: string
 }
 
-let pendingUpdate: Update | null = null
+export type UpdateDownloadState = "idle" | "downloading" | "ready" | "failed"
 
-export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
+export const updateDownloadState = writable<UpdateDownloadState>("idle")
+export const updateReadyInfo = writable<UpdateInfo | null>(null)
+
+let pendingUpdate: Update | null = null
+let backgroundFlowRunning = false
+
+/** Check for updates and download silently; notify UI only when the package is ready. */
+export async function startBackgroundUpdateFlow(): Promise<void> {
+    if (backgroundFlowRunning) return
+    if (get(updateDownloadState) === "ready" && get(updateReadyInfo)) return
+
+    backgroundFlowRunning = true
+    updateDownloadState.set("idle")
+    updateReadyInfo.set(null)
+
     try {
         const update = await check()
         if (!update) {
             pendingUpdate = null
-            return null
+            return
         }
+
         pendingUpdate = update
-        return {
+        updateDownloadState.set("downloading")
+
+        await update.download((event) => {
+            if (event.event === "Progress") {
+                /* background only — no UI */
+            }
+        })
+
+        updateDownloadState.set("ready")
+        updateReadyInfo.set({
             version: update.version,
             notes: update.body ?? "",
             date: update.date ?? "",
-        }
+        })
     } catch (err) {
-        console.error("[Updater] check failed:", err)
-        return null
+        console.error("[Updater] background download failed:", err)
+        pendingUpdate = null
+        updateDownloadState.set("failed")
+        updateReadyInfo.set(null)
+    } finally {
+        backgroundFlowRunning = false
     }
 }
 
-export async function installPendingUpdate(
-    onProgress?: (percent: number) => void
-): Promise<void> {
+export async function installPendingUpdate(): Promise<void> {
     if (!pendingUpdate) {
         throw new Error("No pending update")
+    }
+    if (get(updateDownloadState) !== "ready") {
+        throw new Error("Update is not downloaded yet")
     }
 
     disableIpc()
@@ -47,24 +77,11 @@ export async function installPendingUpdate(
     await new Promise((r) => setTimeout(r, 800))
 
     const update = pendingUpdate
-    let downloaded = 0
-    let total = 0
-
-    await update.downloadAndInstall((event) => {
-        if (event.event === "Started") {
-            total = event.data.contentLength ?? 0
-            onProgress?.(0)
-        } else if (event.event === "Progress") {
-            downloaded += event.data.chunkLength
-            if (total > 0) {
-                onProgress?.(Math.min(100, Math.round((downloaded / total) * 100)))
-            }
-        } else if (event.event === "Finished") {
-            onProgress?.(100)
-        }
-    })
+    await update.install()
 
     pendingUpdate = null
+    updateDownloadState.set("idle")
+    updateReadyInfo.set(null)
     await relaunch()
 }
 

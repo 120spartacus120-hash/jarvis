@@ -15,6 +15,7 @@
     let phrases: string[] = []
     let thanksPhrases: string[] = []
     let weatherPhrases: string[] = []
+    let greetingPhrases: string[] = []
     let userCommands: import("@/lib/customCommands").UserCommand[] = []
     let newPhrase = ""
     let loading = true
@@ -30,6 +31,7 @@
             phrases = [...(config.shutdown_phrases ?? [])]
             thanksPhrases = [...(config.thanks_phrases ?? [])]
             weatherPhrases = [...(config.weather_phrases ?? [])]
+            greetingPhrases = [...(config.greeting_phrases ?? [])]
             userCommands = [...(config.user_commands ?? [])]
         } catch (err) {
             console.error("failed to load custom commands:", err)
@@ -47,6 +49,7 @@
                 thanks_phrases: thanksPhrases,
                 shutdown_phrases: normalizePhrases(phrases),
                 weather_phrases: weatherPhrases,
+                greeting_phrases: greetingPhrases,
                 user_commands: userCommands,
             })
             saved = true

@@ -19,6 +19,8 @@
         Switch
     } from "@svelteuidev/core"
 
+    import LanguageSettings from "@/components/settings/LanguageSettings.svelte"
+
     import {
         Check,
         Mix,
@@ -26,7 +28,8 @@
         Code,
         Gear,
         CrossCircled,
-        Globe
+        Globe,
+        LetterCaseCapitalize
     } from "radix-icons-svelte"
 
     $: t = (key: string) => translate($translations, key)
@@ -240,7 +243,11 @@
             </button>
             <button class="nav-item" class:active={activeTab === 'weather'} on:click={() => activeTab = 'weather'}>
                 <Globe class="nav-icon" />
-                <span>Погода</span>
+                <span>{t('settings-tab-weather')}</span>
+            </button>
+            <button class="nav-item" class:active={activeTab === 'language'} on:click={() => activeTab = 'language'}>
+                <LetterCaseCapitalize class="nav-icon" />
+                <span>{t('settings-language')}</span>
             </button>
         </nav>
 
@@ -509,6 +516,10 @@
                     />
                 </InputWrapper>
             </div>
+        </div>
+
+        <div class="tab-content" class:active={activeTab === 'language'}>
+            <LanguageSettings />
         </div>
 
         <div class="tab-content" class:active={activeTab === 'weather'}>

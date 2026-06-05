@@ -1,15 +1,123 @@
 <script lang="ts">
+    import { onDestroy } from "svelte"
     import { jarvisState } from "@/stores"
 
-    $: stateClass = {
-        'disconnected': 'disconnected',
-        'idle': 'idle',
-        'listening': 'active',
-        'processing': 'active'
-    }[$jarvisState] || 'disconnected'
+    export let activating = false
+    export let online = false
+
+    const BOOT_MS = 3000
+    const TASK_RAMP_MS = 2200
+    /** ~14% быстрее при задаче: 10s → ~8.8s на оборот */
+    const TASK_SPIN_RATE = 1.14
+    const TASK_INTENSITY = 0.42
+
+    let boot = 0
+    let taskBoost = 0
+    let bootRaf = 0
+    let taskRaf = 0
+    let bootPhase: "idle" | "up" | "down" = "idle"
+    let prevTaskBoostTarget = -1
+
+    $: spinRate = 1 + (TASK_SPIN_RATE - 1) * taskBoost
+
+    function easeInOutCubic(t: number) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+    }
+
+    function cancelBoot() {
+        if (bootRaf) cancelAnimationFrame(bootRaf)
+        bootRaf = 0
+    }
+
+    function cancelTaskRamp() {
+        if (taskRaf) cancelAnimationFrame(taskRaf)
+        taskRaf = 0
+    }
+
+    function rampTaskBoost(to: number) {
+        cancelTaskRamp()
+        const from = taskBoost
+        const t0 = performance.now()
+
+        const step = (now: number) => {
+            const p = Math.min(1, (now - t0) / TASK_RAMP_MS)
+            taskBoost = from + (to - from) * easeInOutCubic(p)
+
+            if (p < 1) {
+                taskRaf = requestAnimationFrame(step)
+            } else {
+                taskRaf = 0
+                taskBoost = to
+            }
+        }
+
+        taskRaf = requestAnimationFrame(step)
+    }
+
+    function animateBoot(to: number, duration = BOOT_MS) {
+        cancelBoot()
+        const from = boot
+        const t0 = performance.now()
+
+        const step = (now: number) => {
+            const p = Math.min(1, (now - t0) / duration)
+            boot = from + (to - from) * easeInOutCubic(p)
+            if (p < 1) {
+                bootRaf = requestAnimationFrame(step)
+            } else {
+                bootRaf = 0
+                bootPhase = "idle"
+            }
+        }
+
+        bootRaf = requestAnimationFrame(step)
+    }
+
+    $: taskActive =
+        online &&
+        boot >= 0.99 &&
+        ($jarvisState === "listening" || $jarvisState === "processing")
+
+    $: taskBoostTarget = taskActive && boot >= 0.99 ? 1 : 0
+
+    $: if (taskBoostTarget !== prevTaskBoostTarget) {
+        prevTaskBoostTarget = taskBoostTarget
+        rampTaskBoost(taskBoostTarget)
+    }
+
+    $: {
+        if (activating) {
+            if (bootPhase !== "up") {
+                bootPhase = "up"
+                animateBoot(1)
+            }
+        } else if (!online && boot > 0.01) {
+            if (bootPhase !== "down") {
+                bootPhase = "down"
+                animateBoot(0, 1200)
+            }
+        } else if (online && boot < 0.995) {
+            if (bootPhase !== "up") {
+                bootPhase = "up"
+                animateBoot(1, 600)
+            }
+        } else if (!activating && !online) {
+            bootPhase = "idle"
+        }
+    }
+
+    onDestroy(() => {
+        cancelBoot()
+        cancelTaskRamp()
+    })
 </script>
 
-<div id="arc-reactor" class="reactor-container {stateClass} arc-white">
+<div
+    id="arc-reactor"
+    class="reactor-container booting arc-white"
+    class:command-active={taskBoost > 0.02}
+    style="--boot: {boot}; --intensity: {TASK_INTENSITY * taskBoost}; --spin-rate: {spinRate}"
+>
     <div class="reactor-container-inner circle abs-center">
         <ul class="marks">
             {#each Array(60) as _, i}
@@ -71,10 +179,9 @@
         margin: auto;
         position: relative;
         border-radius: 50%;
-        transition: transform 0.5s ease, opacity 0.5s ease, filter 0.5s ease;
+        transition: transform 1.2s ease, opacity 1.2s ease, filter 1.2s ease;
         transform: scale(0.95);
         opacity: 0.9;
-        top: 10px;
 
         ul {
             list-style: none;
@@ -430,206 +537,6 @@
         }
     }
 
-    // [ DISCONNECTED ]
-    .reactor-container.disconnected {
-        transform: scale(0.85);
-        opacity: 0.4;
-        filter: grayscale(0.7) brightness(0.6);
-        
-        .coil-container { animation-duration: 20s; }
-        .e7 { opacity: 0.3; }
-        
-        .e5_1 {
-            border-top-color: rgba(var(--arc-color), 0.1);
-            border-left-color: rgba(var(--arc-color), 0.1);
-            animation: rotate 35s linear infinite;
-        }
-        .e5_2 {
-            border-right-color: rgba(var(--arc-color), 0.15);
-            border-bottom-color: rgba(var(--arc-color), 0.15);
-            animation: rotate_anti 30s linear infinite;
-        }
-        .e5_3 {
-            border-top-color: rgba(var(--arc-color), 0.2);
-            animation: rotate 25s linear infinite;
-        }
-        .e5_4 {
-            border-bottom-color: rgba(var(--arc-color), 0.25);
-            animation: rotate_anti 28s linear infinite;
-        }
-
-        .e5_1_ghost {
-            border-top-color: rgba(var(--arc-color), 0.03);
-            border-right-color: rgba(var(--arc-color), 0.03);
-            animation: rotate_anti 50s linear infinite;
-        }
-        .e5_2_ghost {
-            border-top-color: rgba(var(--arc-color), 0.05);
-            border-left-color: rgba(var(--arc-color), 0.05);
-            animation: rotate 45s linear infinite;
-        }
-        .e5_3_ghost {
-            border-right-color: rgba(var(--arc-color), 0.06);
-            border-bottom-color: rgba(var(--arc-color), 0.06);
-            animation: rotate_anti 40s linear infinite;
-        }
-        .e5_4_ghost {
-            border-top-color: rgba(var(--arc-color), 0.08);
-            border-left-color: rgba(var(--arc-color), 0.08);
-            animation: rotate 42s linear infinite;
-        }
-    }
-
-    .reactor-container.disconnected::before {
-        opacity: 0.3;
-        transform: translate(-50%, -50%) scale(0.7);
-    }
-
-    // [ IDLE ]
-    .reactor-container.idle {
-        transform: scale(0.95);
-        opacity: 0.9;
-        
-        .core-inner {
-            animation: core-pulse-idle 4s ease-in-out infinite;
-        }
-
-        .coil-container { animation-duration: 10s; }
-        .e7 { opacity: 0.6; }
-        
-        .e5_1 {
-            border-top-color: rgba(var(--arc-color), 0.2);
-            border-left-color: rgba(var(--arc-color), 0.2);
-            animation: rotate 9s linear infinite;
-        }
-        .e5_2 {
-            border-right-color: rgba(var(--arc-color), 0.35);
-            border-bottom-color: rgba(var(--arc-color), 0.35);
-            animation: rotate_anti 15s linear infinite;
-        }
-        .e5_3 {
-            border-top-color: rgba(var(--arc-color), 0.5);
-            animation: rotate 12s linear infinite;
-        }
-        .e5_4 {
-            border-bottom-color: rgba(var(--arc-color), 0.65);
-            animation: rotate_anti 14s linear infinite;
-        }
-
-        .e5_1_ghost {
-            border-top-color: rgba(var(--arc-color), 0.06);
-            border-right-color: rgba(var(--arc-color), 0.06);
-            animation: rotate_anti 14s linear infinite;
-        }
-        .e5_2_ghost {
-            border-top-color: rgba(var(--arc-color), 0.1);
-            border-left-color: rgba(var(--arc-color), 0.1);
-            animation: rotate 22s linear infinite;
-        }
-        .e5_3_ghost {
-            border-right-color: rgba(var(--arc-color), 0.15);
-            border-bottom-color: rgba(var(--arc-color), 0.15);
-            animation: rotate_anti 18s linear infinite;
-        }
-        .e5_4_ghost {
-            border-top-color: rgba(var(--arc-color), 0.2);
-            border-left-color: rgba(var(--arc-color), 0.2);
-            animation: rotate 21s linear infinite;
-        }
-    }
-
-    .reactor-container.idle::before {
-        opacity: 0.7;
-        transform: translate(-50%, -50%) scale(0.9);
-    }
-
-    // [ ACTIVE ]
-    .reactor-container.active {
-        transform: scale(1.05);
-        opacity: 1;
-
-        .core-inner {
-            animation: core-pulse-active 1.5s ease-in-out infinite;
-        }
-
-        .coil-container { animation-duration: 3s; }
-        .e7 { opacity: 1; }
-
-        .e5_1 {
-            border-top-color: rgba(var(--arc-color), 0.3);
-            border-left-color: rgba(var(--arc-color), 0.3);
-            animation: rotate 4s linear infinite;
-        }
-        .e5_2 {
-            border-right-color: rgba(var(--arc-color), 0.5);
-            border-bottom-color: rgba(var(--arc-color), 0.5);
-            animation: rotate_anti 3s linear infinite;
-        }
-        .e5_3 {
-            border-top-color: rgba(var(--arc-color), 0.7);
-            animation: rotate 2s linear infinite;
-        }
-        .e5_4 {
-            border-bottom-color: rgba(var(--arc-color), 0.9);
-            animation: rotate_anti 2.5s linear infinite;
-        }
-
-        .e5_1_ghost {
-            border-top-color: rgba(var(--arc-color), 0.1);
-            border-right-color: rgba(var(--arc-color), 0.1);
-            animation: rotate_anti 6s linear infinite;
-        }
-        .e5_2_ghost {
-            border-top-color: rgba(var(--arc-color), 0.15);
-            border-left-color: rgba(var(--arc-color), 0.15);
-            animation: rotate 4.5s linear infinite;
-        }
-        .e5_3_ghost {
-            border-right-color: rgba(var(--arc-color), 0.2);
-            border-bottom-color: rgba(var(--arc-color), 0.2);
-            animation: rotate_anti 3s linear infinite;
-        }
-        .e5_4_ghost {
-            border-top-color: rgba(var(--arc-color), 0.28);
-            border-left-color: rgba(var(--arc-color), 0.28);
-            animation: rotate 3.75s linear infinite;
-        }
-
-        .reactor-container-inner {
-            box-shadow: 0px 0px 70px 25px rgba(var(--arc-color), 0.3), 
-                        inset 0px 0px 70px 25px rgba(var(--arc-color), 0.3);
-        }
-
-        .core-inner {
-            /* Handled by animation now */
-        }
-
-        .core-outer {
-            box-shadow: 0px 0px 5px 3px var(--arc-glow), 
-                        0px 0px 15px 10px var(--arc-glow) inset;
-        }
-
-        .core-wrapper {
-            box-shadow: 0px 0px 10px 8px var(--arc-glow), 
-                        0px 0px 10px 5px var(--arc-glow) inset;
-        }
-
-        .tunnel {
-            box-shadow: 0px 0px 10px 3px var(--arc-glow), 
-                        0px 0px 10px 8px var(--arc-glow) inset;
-        }
-
-        .marks li {
-            animation: colour_ease2_active 1.5s infinite ease-in-out;
-        }
-    }
-
-    .reactor-container.active::before {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1.1);
-        animation: bg-pulse 3s ease-in-out infinite;
-    }
-
     @keyframes bg-pulse {
         0%, 100% { 
             opacity: 1;
@@ -641,9 +548,123 @@
         }
     }
 
-    @keyframes colour_ease2_active {
-        0% { background: rgba(var(--arc-color), 1); box-shadow: 0 0 5px rgba(var(--arc-color), 1); }
-        50% { background: rgba(var(--arc-color), 0.3); box-shadow: none; }
-        100% { background: rgba(var(--arc-color), 1); box-shadow: 0 0 5px rgba(var(--arc-color), 1); }
+    // [ BOOT + INTENSITY — boot: вкл.; --spin-rate: чуть быстрее при задаче (rAF, без transition) ]
+    .reactor-container.booting {
+        --intensity: 0;
+        --spin-rate: 1;
+        transform: scale(calc(0.85 + 0.1 * var(--boot) + 0.02 * var(--intensity)));
+        opacity: calc(0.4 + 0.5 * var(--boot) + 0.04 * var(--intensity));
+        filter: grayscale(calc(0.7 * (1 - var(--boot)))) brightness(calc(0.6 + 0.4 * var(--boot)));
+
+        .coil-container {
+            animation-duration: calc((35s - 25s * var(--boot)) / var(--spin-rate));
+        }
+
+        .e7 {
+            opacity: calc(0.3 + 0.3 * var(--boot) + 0.12 * var(--intensity));
+        }
+
+        .core-inner {
+            box-shadow:
+                0 0 calc(7px + 8px * var(--boot) + 3px * var(--intensity)) calc(5px + 5px * var(--boot) + 2px * var(--intensity)) var(--arc-glow),
+                0 0 calc(10px + 10px * var(--boot) + 4px * var(--intensity)) calc(10px + 5px * var(--boot) + 2px * var(--intensity)) var(--arc-glow) inset;
+            animation: core-pulse-idle calc(6s - 2s * var(--boot)) ease-in-out infinite;
+        }
+
+        .core-outer {
+            box-shadow:
+                0 0 calc(2px + 1px * var(--intensity)) calc(1px + 0.5px * var(--intensity)) var(--arc-glow),
+                0 0 calc(10px + 2px * var(--intensity)) calc(5px + 2px * var(--intensity)) var(--arc-glow) inset;
+        }
+
+        .core-wrapper {
+            box-shadow:
+                0 0 calc(5px + 2px * var(--intensity)) calc(4px + 1px * var(--intensity)) var(--arc-glow),
+                0 0 calc(6px + 2px * var(--intensity)) calc(2px + 1px * var(--intensity)) var(--arc-glow) inset;
+        }
+
+        .tunnel {
+            box-shadow:
+                0 0 calc(5px + 2px * var(--intensity)) calc(1px + 0.5px * var(--intensity)) var(--arc-glow),
+                0 0 calc(5px + 2px * var(--intensity)) calc(4px + 1px * var(--intensity)) var(--arc-glow) inset;
+        }
+
+        .reactor-container-inner {
+            box-shadow:
+                0 0 calc(50px + 20px * var(--boot) + 8px * var(--intensity)) calc(15px + 10px * var(--boot) + 4px * var(--intensity)) rgba(var(--arc-color), calc(0.3 * var(--boot) + 0.06 * var(--intensity))),
+                inset 0 0 calc(50px + 20px * var(--boot) + 8px * var(--intensity)) calc(15px + 10px * var(--boot) + 4px * var(--intensity)) rgba(var(--arc-color), calc(0.3 * var(--boot) + 0.06 * var(--intensity)));
+        }
+
+        .e5_1 {
+            border-top-color: rgba(var(--arc-color), calc(0.1 + 0.1 * var(--boot) + 0.06 * var(--intensity)));
+            border-left-color: rgba(var(--arc-color), calc(0.1 + 0.1 * var(--boot) + 0.06 * var(--intensity)));
+            animation-duration: calc((35s - 26s * var(--boot)) / var(--spin-rate));
+        }
+
+        .e5_2 {
+            border-right-color: rgba(var(--arc-color), calc(0.15 + 0.2 * var(--boot) + 0.08 * var(--intensity)));
+            border-bottom-color: rgba(var(--arc-color), calc(0.15 + 0.2 * var(--boot) + 0.08 * var(--intensity)));
+            animation-duration: calc((30s - 15s * var(--boot)) / var(--spin-rate));
+        }
+
+        .e5_3 {
+            border-top-color: rgba(var(--arc-color), calc(0.2 + 0.3 * var(--boot) + 0.1 * var(--intensity)));
+            animation-duration: calc((25s - 13s * var(--boot)) / var(--spin-rate));
+        }
+
+        .e5_4 {
+            border-bottom-color: rgba(var(--arc-color), calc(0.25 + 0.4 * var(--boot) + 0.12 * var(--intensity)));
+            animation-duration: calc((28s - 14s * var(--boot)) / var(--spin-rate));
+        }
+
+        .e5_1_ghost {
+            border-top-color: rgba(var(--arc-color), calc(0.03 + 0.03 * var(--boot) + 0.02 * var(--intensity)));
+            border-right-color: rgba(var(--arc-color), calc(0.03 + 0.03 * var(--boot) + 0.02 * var(--intensity)));
+            animation-duration: calc((50s - 36s * var(--boot)) / var(--spin-rate));
+        }
+
+        .e5_2_ghost {
+            border-top-color: rgba(var(--arc-color), calc(0.05 + 0.05 * var(--boot) + 0.03 * var(--intensity)));
+            border-left-color: rgba(var(--arc-color), calc(0.05 + 0.05 * var(--boot) + 0.03 * var(--intensity)));
+            animation-duration: calc((45s - 23s * var(--boot)) / var(--spin-rate));
+        }
+
+        .e5_3_ghost {
+            border-right-color: rgba(var(--arc-color), calc(0.06 + 0.09 * var(--boot) + 0.04 * var(--intensity)));
+            border-bottom-color: rgba(var(--arc-color), calc(0.06 + 0.09 * var(--boot) + 0.04 * var(--intensity)));
+            animation-duration: calc((40s - 22s * var(--boot)) / var(--spin-rate));
+        }
+
+        .e5_4_ghost {
+            border-top-color: rgba(var(--arc-color), calc(0.08 + 0.12 * var(--boot) + 0.05 * var(--intensity)));
+            border-left-color: rgba(var(--arc-color), calc(0.08 + 0.12 * var(--boot) + 0.05 * var(--intensity)));
+            animation-duration: calc((42s - 21s * var(--boot)) / var(--spin-rate));
+        }
+
+        .marks li {
+            background: rgba(var(--arc-color), calc(0.3 + 0.7 * var(--boot)));
+            animation-duration: 3s;
+        }
+    }
+
+    .reactor-container.booting::before {
+        opacity: calc(0.3 + 0.4 * var(--boot) + 0.1 * var(--intensity));
+        transform: translate(-50%, -50%) scale(calc(0.7 + 0.2 * var(--boot) + 0.06 * var(--intensity)));
+    }
+
+    .reactor-container.booting.command-active::before {
+        animation: bg-pulse 5s ease-in-out infinite;
+    }
+
+    .reactor-container.booting .coil-container,
+    .reactor-container.booting .e5_1,
+    .reactor-container.booting .e5_2,
+    .reactor-container.booting .e5_3,
+    .reactor-container.booting .e5_4,
+    .reactor-container.booting .e5_1_ghost,
+    .reactor-container.booting .e5_2_ghost,
+    .reactor-container.booting .e5_3_ghost,
+    .reactor-container.booting .e5_4_ghost {
+        animation-timing-function: linear;
     }
 </style>

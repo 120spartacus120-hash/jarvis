@@ -94,6 +94,7 @@ fn main() {
             tauri_commands::get_current_language,
             tauri_commands::set_language,
             tauri_commands::get_supported_languages,
+            tauri_commands::get_language_options,
 
             // commands
             tauri_commands::get_custom_commands,

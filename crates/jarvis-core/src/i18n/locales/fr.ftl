@@ -1,6 +1,6 @@
 # ### APP INFO
 app-name = JARVIS
-app-description = Voice Assistant
+app-description = Assistant vocal
 
 # ### TRAY MENU
 tray-restart = Restart
@@ -59,11 +59,11 @@ settings-neural-networks = Neural Networks
 settings-audio = Audio
 settings-recognition = Recognition
 settings-about = About
-settings-language = Language
-settings-language-interface = Interface language
-settings-language-desc = Menus, buttons, and notifications in the app.
-settings-language-restart-note = The app will restart automatically after you change the language.
-settings-tab-weather = Weather
+settings-language = Langue
+settings-language-interface = Langue de l'interface
+settings-language-desc = Menus, boutons et notifications de l'application.
+settings-language-restart-note = L'application redémarrera automatiquement après le changement de langue.
+settings-tab-weather = Météo
 settings-microphone = Microphone
 settings-microphone-desc = The assistant will listen to this microphone.
 settings-mic-default = Default (System)

@@ -2,38 +2,28 @@
     import { onMount } from "svelte"
     import { translations, translate } from "@/stores"
     import {
-        checkForAppUpdate,
+        startBackgroundUpdateFlow,
         installPendingUpdate,
-        type UpdateInfo,
+        updateReadyInfo,
     } from "@/lib/updater"
 
     $: t = (key: string, args?: Record<string, string>) =>
         translate($translations, key, args)
 
-    let updateInfo: UpdateInfo | null = null
     let dismissed = false
     let installing = false
-    let progress = 0
     let error = ""
 
     onMount(() => {
-        void refresh()
+        void startBackgroundUpdateFlow()
     })
 
-    async function refresh() {
-        error = ""
-        updateInfo = await checkForAppUpdate()
-    }
-
     async function install() {
-        if (!updateInfo || installing) return
+        if (!$updateReadyInfo || installing) return
         installing = true
         error = ""
-        progress = 0
         try {
-            await installPendingUpdate((p) => {
-                progress = p
-            })
+            await installPendingUpdate()
         } catch (err) {
             console.error("[Updater] install failed:", err)
             error = String(err)
@@ -46,19 +36,17 @@
     }
 </script>
 
-{#if updateInfo && !dismissed}
+{#if $updateReadyInfo && !dismissed}
     <div class="update-banner" class:installing>
         <div class="update-text">
             <span class="update-title">
-                {t("update-available", { version: updateInfo.version })}
+                {t("update-available", { version: $updateReadyInfo.version })}
             </span>
-            {#if updateInfo.notes}
-                <span class="update-notes">{updateInfo.notes}</span>
+            {#if $updateReadyInfo.notes}
+                <span class="update-notes">{$updateReadyInfo.notes}</span>
             {/if}
             {#if installing}
-                <span class="update-progress">
-                    {t("update-downloading", { percent: String(progress) })}
-                </span>
+                <span class="update-progress">{t("update-installing")}</span>
             {/if}
             {#if error}
                 <span class="update-error">{t("update-error")}: {error}</span>

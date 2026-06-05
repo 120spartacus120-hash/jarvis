@@ -204,6 +204,7 @@
                 thanks_phrases: config.thanks_phrases,
                 shutdown_phrases: config.shutdown_phrases,
                 weather_phrases: config.weather_phrases ?? [],
+                greeting_phrases: config.greeting_phrases ?? [],
                 user_commands: userCommands,
             })
 
@@ -229,6 +230,7 @@
                 thanks_phrases: config.thanks_phrases,
                 shutdown_phrases: config.shutdown_phrases,
                 weather_phrases: config.weather_phrases ?? [],
+                greeting_phrases: config.greeting_phrases ?? [],
                 user_commands: config.user_commands.filter((cmd) => cmd.id !== commandId),
             })
             $goto("/commands")

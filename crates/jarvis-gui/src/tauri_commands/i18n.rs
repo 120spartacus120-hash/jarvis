@@ -43,3 +43,8 @@ pub fn set_language(state: tauri::State<'_, AppState>, lang: &str) -> HashMap<St
 pub fn get_supported_languages() -> Vec<&'static str> {
     i18n::SUPPORTED_LANGUAGES.to_vec()
 }
+
+#[tauri::command]
+pub fn get_language_options() -> Vec<i18n::LanguageOption> {
+    i18n::language_options()
+}

@@ -53,6 +53,8 @@ pub struct CustomCommandsConfig {
     pub shutdown_phrases: Vec<String>,
     #[serde(default = "default_weather_phrases")]
     pub weather_phrases: Vec<String>,
+    #[serde(default = "default_greeting_phrases")]
+    pub greeting_phrases: Vec<String>,
     #[serde(default)]
     pub user_commands: Vec<UserCommand>,
 }
@@ -89,6 +91,19 @@ fn default_thanks_phrases() -> Vec<String> {
         "ты супер".into(),
         "отличная работа".into(),
         "ты крут".into(),
+    ]
+}
+
+fn default_greeting_phrases() -> Vec<String> {
+    vec![
+        "привет".into(),
+        "здравствуй".into(),
+        "здравствуйте".into(),
+        "доброе утро".into(),
+        "добрый день".into(),
+        "добрый вечер".into(),
+        "как дела".into(),
+        "рад тебя слышать".into(),
     ]
 }
 
@@ -184,6 +199,7 @@ impl Default for CustomCommandsConfig {
             thanks_phrases: default_thanks_phrases(),
             shutdown_phrases: default_shutdown_phrases(),
             weather_phrases: default_weather_phrases(),
+            greeting_phrases: default_greeting_phrases(),
             user_commands: Vec::new(),
         }
     }
@@ -290,7 +306,7 @@ pub fn save(config: &CustomCommandsConfig) -> Result<(), String> {
 }
 
 pub fn commands_count(config: &CustomCommandsConfig) -> usize {
-    4 + normalize_config(config.clone()).user_commands.len()
+    5 + normalize_config(config.clone()).user_commands.len()
 }
 
 fn normalize_phrases(phrases: Vec<String>, fallback: fn() -> Vec<String>) -> Vec<String> {
@@ -311,6 +327,7 @@ pub fn normalize_config(mut config: CustomCommandsConfig) -> CustomCommandsConfi
     config.thanks_phrases = normalize_phrases(config.thanks_phrases, default_thanks_phrases);
     config.shutdown_phrases = normalize_phrases(config.shutdown_phrases, default_shutdown_phrases);
     config.weather_phrases = normalize_phrases(config.weather_phrases, default_weather_phrases);
+    config.greeting_phrases = normalize_phrases(config.greeting_phrases, default_greeting_phrases);
 
     config.user_commands = config
         .user_commands
@@ -542,6 +559,22 @@ pub fn to_commands_list(config: &CustomCommandsConfig) -> Vec<JCommandsList> {
     let lang = i18n::get_language();
 
     let mut commands = Vec::new();
+
+    commands.push(JCommand::new(
+        "builtin_greeting".into(),
+        "greeting".into(),
+        "Приветствие".into(),
+        String::new(),
+        vec![],
+        String::new(),
+        vec![],
+        String::new(),
+        String::new(),
+        0,
+        HashMap::new(),
+        phrase_map(&lang, &config.greeting_phrases),
+        HashMap::new(),
+    ));
 
     commands.push(JCommand::new(
         "builtin_thanks".into(),

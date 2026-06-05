@@ -1,16 +1,13 @@
 <script lang="ts">
     import { onMount } from "svelte"
     import { goto } from "@roxi/routify"
-    import { invoke } from "@tauri-apps/api/core"
 
     import HDivider from "@/components/elements/HDivider.svelte"
     import Footer from "@/components/Footer.svelte"
     import { translations, translate } from "@/stores"
-    import { reloadSettings } from "@/lib/ipc"
     import { loadCustomCommands, saveCustomCommands, normalizePhrases } from "@/lib/customCommands"
-    import { resolveWeatherCity, WEATHER_CITIES } from "@/lib/weatherCities"
 
-    import { Button, Alert, NativeSelect } from "@svelteuidev/core"
+    import { Button, Input, Alert } from "@svelteuidev/core"
     import { Plus, Trash, ArrowLeft } from "radix-icons-svelte"
 
     $: t = (key: string, args?: Record<string, string | number>) => translate($translations, key, args)
@@ -18,32 +15,26 @@
     let phrases: string[] = []
     let thanksPhrases: string[] = []
     let shutdownPhrases: string[] = []
-    let greetingPhrases: string[] = []
+    let weatherPhrases: string[] = []
     let userCommands: import("@/lib/customCommands").UserCommand[] = []
-    let weatherCity = ""
     let newPhrase = ""
     let loading = true
     let saving = false
     let saved = false
     let loadError = ""
-    let saveError = ""
 
     async function loadConfig() {
         loading = true
         loadError = ""
         try {
-            const [config, city] = await Promise.all([
-                loadCustomCommands(),
-                invoke<string>("db_read", { key: "weather_city" }).catch(() => ""),
-            ])
-            phrases = [...(config.weather_phrases ?? [])]
+            const config = await loadCustomCommands()
+            phrases = [...(config.greeting_phrases ?? [])]
             thanksPhrases = [...(config.thanks_phrases ?? [])]
             shutdownPhrases = [...(config.shutdown_phrases ?? [])]
-            greetingPhrases = [...(config.greeting_phrases ?? [])]
+            weatherPhrases = [...(config.weather_phrases ?? [])]
             userCommands = [...(config.user_commands ?? [])]
-            weatherCity = resolveWeatherCity(city)
         } catch (err) {
-            console.error("failed to load weather command:", err)
+            console.error("failed to load custom commands:", err)
             loadError = t("error-generic")
         } finally {
             loading = false
@@ -51,36 +42,23 @@
     }
 
     async function saveConfig() {
-        const city = resolveWeatherCity(weatherCity)
-        weatherCity = city
-
         saving = true
         saved = false
-        saveError = ""
         try {
-            const ok = await invoke<boolean>("db_write", { key: "weather_city", val: city })
-            if (!ok) {
-                saveError = t("error-generic")
-                return
-            }
-
-            await reloadSettings()
-
             await saveCustomCommands({
+                greeting_phrases: normalizePhrases(phrases),
                 thanks_phrases: thanksPhrases,
                 shutdown_phrases: shutdownPhrases,
-                weather_phrases: normalizePhrases(phrases),
-                greeting_phrases: greetingPhrases,
+                weather_phrases: weatherPhrases,
                 user_commands: userCommands,
             })
-
             saved = true
             setTimeout(() => {
                 saved = false
             }, 3000)
         } catch (err) {
-            console.error("failed to save weather command:", err)
-            saveError = t("error-generic")
+            console.error("failed to save custom commands:", err)
+            loadError = t("error-generic")
         } finally {
             saving = false
         }
@@ -117,14 +95,14 @@
     </button>
 
     <header class="form-header">
-        <h1>{t("commands-card-weather")}</h1>
-        <p>{t("commands-weather-desc")}</p>
+        <h1>{t("commands-card-greeting")}</h1>
+        <p>{t("commands-greeting-desc")}</p>
     </header>
 
     {#if loading}
         <p class="hint">{t("stats-loading")}</p>
     {:else}
-        {#if saved || loadError || saveError}
+        {#if saved || loadError}
             <div class="alerts">
                 {#if saved}
                     <Alert color="green" title={t("commands-saved")} />
@@ -132,37 +110,19 @@
                 {#if loadError}
                     <Alert color="red" title={loadError} />
                 {/if}
-                {#if saveError}
-                    <Alert color="red" title={saveError} />
-                {/if}
             </div>
         {/if}
 
         <section class="form-section">
             <div class="section-label">
                 <span class="step">1</span>
-                <span>{t("commands-weather-city-label")}</span>
-            </div>
-            <p class="section-hint">{t("commands-weather-city-hint")}</p>
-            <NativeSelect
-                data={WEATHER_CITIES.map((c) => ({ label: c.label, value: c.value }))}
-                label={t("commands-weather-city-label")}
-                variant="filled"
-                bind:value={weatherCity}
-            />
-        </section>
-
-        <section class="form-section">
-            <div class="section-label">
-                <span class="step">2</span>
                 <span>{t("commands-phrases-title")}</span>
             </div>
-            <p class="section-hint">{t("commands-hint")}</p>
+            <p class="section-hint">{t("commands-greeting-hint")}</p>
 
             <div class="phrase-add" role="group" on:keydown={handlePhraseKeydown}>
-                <input
-                    class="phrase-input"
-                    placeholder={t("commands-phrase-placeholder-weather")}
+                <Input
+                    placeholder={t("commands-phrase-placeholder-greeting")}
                     bind:value={newPhrase}
                 />
                 <Button on:click={addPhrase} disabled={!newPhrase.trim()}>
@@ -200,14 +160,4 @@
 
 <style lang="scss">
     @use "../../../css/builtin-command-page.scss";
-
-    .phrase-input {
-        flex: 1;
-        padding: 0.65rem 0.75rem;
-        border-radius: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(8, 16, 20, 0.85);
-        color: #fff;
-        font-size: 0.85rem;
-    }
 </style>
