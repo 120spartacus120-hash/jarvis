@@ -243,6 +243,74 @@ pub fn fetch_weather_command<'a>(
     result.or_else(|| get_command_by_id(commands, "builtin_weather"))
 }
 
+/// Match greeting phrases (exact or fuzzy) against `builtin_greeting`.
+#[cfg(feature = "jarvis_app")]
+pub fn fetch_greeting_command<'a>(
+    phrase: &str,
+    commands: &'a [JCommandsList],
+) -> Option<(&'a PathBuf, &'a JCommand)> {
+    let phrase = crate::speech_normalize::normalize(&phrase.trim().to_lowercase());
+    if phrase.is_empty() {
+        return None;
+    }
+
+    let config = crate::custom_commands::load();
+    let greeting_phrases = config.greeting_phrases;
+    if greeting_phrases.is_empty() {
+        return None;
+    }
+
+    if greeting_phrases.iter().any(|p| p == &phrase) {
+        info!("Greeting exact match: '{}'", phrase);
+        return get_command_by_id(commands, "builtin_greeting");
+    }
+
+    let phrase_chars: Vec<char> = phrase.chars().collect();
+    let phrase_words: Vec<&str> = phrase.split_whitespace().collect();
+    let lang = crate::i18n::get_language();
+
+    let mut result: Option<(&PathBuf, &JCommand)> = None;
+    let mut best_score = config::CMD_RATIO_THRESHOLD;
+
+    for cmd_list in commands {
+        for cmd in &cmd_list.commands {
+            if cmd.id != "builtin_greeting" {
+                continue;
+            }
+
+            for cmd_phrase in cmd.get_phrases(&lang).iter() {
+                let cmd_phrase_lower = cmd_phrase.trim().to_lowercase();
+                let cmd_phrase_chars: Vec<char> = cmd_phrase_lower.chars().collect();
+                let char_ratio = ratio(&phrase_chars, &cmd_phrase_chars);
+                let cmd_words: Vec<&str> = cmd_phrase_lower.split_whitespace().collect();
+                let word_score = word_overlap_score(&phrase_words, &cmd_words);
+                let score = (char_ratio * 0.6) + (word_score * 0.4);
+
+                if score >= 99.0 {
+                    info!(
+                        "Greeting match: '{}' -> '{}'",
+                        phrase, cmd_phrase_lower
+                    );
+                    return Some((&cmd_list.path, cmd));
+                }
+
+                if score > best_score {
+                    best_score = score;
+                    result = Some((&cmd_list.path, cmd));
+                }
+            }
+        }
+    }
+
+    if let Some((_, cmd)) = result {
+        info!(
+            "Greeting fuzzy: '{}' -> {} (score: {:.1}%)",
+            phrase, cmd.id, best_score
+        );
+    }
+
+    result
+}
 
 fn word_overlap_score(input_words: &[&str], cmd_words: &[&str]) -> f64 {
     if input_words.is_empty() || cmd_words.is_empty() {
@@ -490,6 +558,12 @@ pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option
             {
                 Err("Volume commands are only supported on Windows.".into())
             }
+        }
+
+        #[cfg(feature = "jarvis_app")]
+        "greeting" => {
+            crate::greeting::play_random_greeting();
+            Ok(false)
         }
 
         #[cfg(feature = "jarvis_app")]

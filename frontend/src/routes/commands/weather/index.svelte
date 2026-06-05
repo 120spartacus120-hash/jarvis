@@ -18,6 +18,7 @@
     let phrases: string[] = []
     let thanksPhrases: string[] = []
     let shutdownPhrases: string[] = []
+    let greetingPhrases: string[] = []
     let userCommands: import("@/lib/customCommands").UserCommand[] = []
     let weatherCity = ""
     let newPhrase = ""
@@ -38,6 +39,7 @@
             phrases = [...(config.weather_phrases ?? [])]
             thanksPhrases = [...(config.thanks_phrases ?? [])]
             shutdownPhrases = [...(config.shutdown_phrases ?? [])]
+            greetingPhrases = [...(config.greeting_phrases ?? [])]
             userCommands = [...(config.user_commands ?? [])]
             weatherCity = resolveWeatherCity(city)
         } catch (err) {
@@ -68,6 +70,7 @@
                 thanks_phrases: thanksPhrases,
                 shutdown_phrases: shutdownPhrases,
                 weather_phrases: normalizePhrases(phrases),
+                greeting_phrases: greetingPhrases,
                 user_commands: userCommands,
             })
 

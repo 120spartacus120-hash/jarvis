@@ -52,6 +52,9 @@ pub mod path_util;
 #[cfg(feature = "jarvis_app")]
 pub mod weather;
 
+#[cfg(feature = "jarvis_app")]
+pub mod greeting;
+
 #[cfg(feature = "lua")]
 pub mod lua;
 

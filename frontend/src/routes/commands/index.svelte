@@ -73,6 +73,15 @@
 
         const builtin: CommandCard[] = [
             {
+                id: "greeting",
+                title: t("commands-card-greeting"),
+                descKey: "commands-card-greeting-desc",
+                route: "/commands/greeting",
+                phraseCount: config.greeting_phrases?.length ?? 0,
+                configured: (config.greeting_phrases?.length ?? 0) > 0,
+                builtin: true,
+            },
+            {
                 id: "thanks",
                 title: t("commands-card-thanks"),
                 descKey: "commands-card-thanks-desc",
@@ -221,11 +230,19 @@
         {:else}
             <div class="command-grid">
                 {#each filtered as card}
-                    <button type="button" class="command-card" on:click={() => openCard(card)}>
+                    <button
+                        type="button"
+                        class="command-card"
+                        class:builtin-card={card.builtin}
+                        class:user-card={!card.builtin}
+                        on:click={() => openCard(card)}
+                    >
                         <div class="card-head">
                             <span class="card-title">{card.title}</span>
-                            {#if card.configured}
-                                <span class="card-badge ok">{t("commands-configured")}</span>
+                            {#if card.builtin}
+                                <span class="card-badge builtin">{t("commands-builtin")}</span>
+                            {:else if card.configured}
+                                <span class="card-badge user">{t("commands-configured")}</span>
                             {:else}
                                 <span class="card-badge">{t("commands-not-configured")}</span>
                             {/if}
@@ -363,7 +380,14 @@
         cursor: pointer;
         transition: all 0.2s ease;
 
-        &:hover {
+        &.builtin-card:hover {
+            border-color: rgba(82, 200, 254, 0.28);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            background: rgba(30, 38, 48, 0.8);
+        }
+
+        &.user-card:hover {
             border-color: rgba(138, 200, 50, 0.4);
             transform: translateY(-2px);
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
@@ -395,7 +419,13 @@
         color: rgba(255, 255, 255, 0.5);
         background: rgba(255, 255, 255, 0.08);
 
-        &.ok {
+        &.builtin {
+            color: #7ec8e8;
+            background: rgba(82, 200, 254, 0.12);
+            border: 1px solid rgba(82, 200, 254, 0.18);
+        }
+
+        &.user {
             color: #8AC832;
             background: rgba(138, 200, 50, 0.15);
         }

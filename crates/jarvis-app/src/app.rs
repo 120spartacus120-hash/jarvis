@@ -368,7 +368,7 @@ fn finish_command_execution(
                 return false;
             }
 
-            if cmd_config.cmd_type != "weather" {
+            if cmd_config.cmd_type != "weather" && cmd_config.cmd_type != "greeting" {
                 jarvis_core::custom_commands::play_command_response(
                     jarvis_core::custom_commands::command_response_line(cmd_config),
                     cmd_config.get_sounds(&i18n::get_language()).as_slice(),
@@ -413,16 +413,30 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
             return finish_command_execution(&cmd_path, &cmd_config, &text, None);
         }
     }
-    
-    let cmd_result = if let Some((intent_id, confidence)) = 
-        rt.block_on(intent::classify(&text)) 
+
+    if let Some((cmd_path, cmd_config)) =
+        commands::fetch_greeting_command(&text, &commands_list)
+    {
+        info!(
+            "Greeting phrase detected: '{}' -> {}",
+            text, cmd_config.id
+        );
+        return finish_command_execution(&cmd_path, &cmd_config, &text, None);
+    }
+
+    let cmd_result = if let Some((intent_id, confidence)) =
+        rt.block_on(intent::classify(&text))
     {
         info!("Intent recognized: {} (confidence: {:.2})", intent_id, confidence);
         intent::get_command_by_intent(&commands_list, &intent_id)
     } else {
-        info!("Intent not recognized, trying levenshtein fallback...");
-        commands::fetch_command(&text, &commands_list)
+        None
     };
+
+    let cmd_result = cmd_result.or_else(|| {
+        info!("Intent not matched, trying levenshtein fallback...");
+        commands::fetch_command(&text, &commands_list)
+    });
     
     if let Some((cmd_path, cmd_config)) = cmd_result {
         info!("Command found: {:?}", cmd_path);

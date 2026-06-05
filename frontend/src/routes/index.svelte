@@ -16,11 +16,13 @@
         sendTextCommand
     } from "@/stores"
     import { get } from "svelte/store"
-    import { LightningBolt } from "radix-icons-svelte"
 
     $: t = (key: string) => translate($translations, key)
 
+    const ACTIVATION_MS = 3000
+
     let processRunning = false
+    let activating = false
     let launching = false
     let startError = ""
     $: statusKey =
@@ -45,51 +47,70 @@
     })
 
     async function runAssistant() {
+        if (activating || processRunning) return
+
+        activating = true
         launching = true
         startError = ""
+
+        const startedAt = Date.now()
+
         try {
             await invoke("run_jarvis_app")
-            setTimeout(async () => {
-                await updateJarvisStats()
-                launching = false
-                if (!get(isJarvisRunning)) {
-                    startError = "Ассистент не запустился. Проверьте логи."
-                }
-            }, 2500)
+
+            const elapsed = Date.now() - startedAt
+            const remaining = Math.max(0, ACTIVATION_MS - elapsed)
+            if (remaining > 0) {
+                await new Promise((resolve) => setTimeout(resolve, remaining))
+            }
+
+            await updateJarvisStats()
+
+            if (!get(isJarvisRunning)) {
+                activating = false
+                startError = "Ассистент не запустился. Проверьте логи."
+            } else {
+                await new Promise((resolve) => setTimeout(resolve, 300))
+            }
         } catch (err) {
             console.error("Failed to run jarvis-app:", err)
             startError = String(err)
+            activating = false
+        } finally {
             launching = false
+            if (get(isJarvisRunning)) {
+                activating = false
+            }
         }
     }
 </script>
 
 <div class="minimal-layout">
-    <!-- Top Navigation -->
-    <nav class="top-nav">
-        <div class="top-right-controls">
-            {#if processRunning}
-                <div class="stats-area">
-                    <Stats />
-                </div>
-            {:else}
-                <button class="power-btn" on:click={runAssistant} disabled={launching}>
-                    <LightningBolt size={16} />
-                    {launching ? t("btn-starting") : t("btn-start")}
-                </button>
-            {/if}
-        </div>
+    <nav class="top-nav" class:visible={processRunning && !activating}>
+        {#if processRunning && !activating}
+            <div class="stats-area">
+                <Stats />
+            </div>
+        {/if}
     </nav>
 
-    <!-- Main Centerpiece -->
     <main class="hero-center">
-        <div class="reactor-showcase" class:offline={!processRunning}>
-            <ArcReactor />
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div 
+            class="reactor-showcase" 
+            class:clickable={!processRunning && !activating}
+            on:click={() => {
+                if (!processRunning && !activating) runAssistant();
+            }}
+        >
+            <ArcReactor {activating} online={processRunning} />
         </div>
-        
+
         <div class="typography-section">
-            <h1 class="main-title">{processRunning ? t(statusKey) : "JARVIS"}</h1>
-            <p class="sub-title">{statusHint}</p>
+            <h1 class="main-title">{processRunning && !activating ? t(statusKey) : "JARVIS"}</h1>
+            <p class="sub-title">{activating ? t("btn-starting") : statusHint}</p>
+
             {#if startError || $lastError}
                 <p class="error-text">{startError || $lastError}</p>
             {/if}
@@ -133,43 +154,22 @@
     }
 
     .top-nav {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
         display: flex;
         justify-content: flex-end;
         align-items: center;
-        padding: 2.5rem 2.5rem 1rem;
-        z-index: 10;
-    }
+        padding: 1.5rem 2.5rem 0;
+        z-index: 20;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.8s ease;
 
-    .top-right-controls {
-        display: flex;
-        align-items: center;
-        height: 100%;
-    }
-
-    .power-btn {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        background: rgba(82, 254, 254, 0.05);
-        border: 1px solid rgba(82, 254, 254, 0.2);
-        color: #52fefe;
-        padding: 0.5rem 1.25rem;
-        border-radius: 100px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        cursor: pointer;
-        transition: all 0.2s ease;
-
-        &:hover:not(:disabled) {
-            background: rgba(82, 254, 254, 0.15);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(82, 254, 254, 0.1);
-        }
-
-        &:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        &.visible {
+            opacity: 1;
+            pointer-events: auto;
         }
     }
 
@@ -180,37 +180,21 @@
         align-items: center;
         justify-content: center;
         z-index: 10;
-        margin-top: 2vh;
+        min-height: 0;
     }
 
     .reactor-showcase {
         margin-bottom: 2.5rem;
-        transition: all 0.5s ease;
         position: relative;
+        border-radius: 50%;
+        width: 300px;
+        height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
 
-        &::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 160%;
-            height: 160%;
-            background: radial-gradient(circle, rgba(82, 254, 254, 0.15) 0%, transparent 60%);
-            z-index: -1;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 1s ease;
-        }
-
-        &:not(.offline)::after {
-            opacity: 1;
-        }
-
-        &.offline {
-            opacity: 0.5;
-            filter: grayscale(0.9) brightness(0.7);
-            transform: scale(0.95);
+        &.clickable {
+            cursor: pointer;
         }
     }
 

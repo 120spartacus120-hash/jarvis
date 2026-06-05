@@ -16,14 +16,19 @@ if exist "dist" rd /s /q "dist"
 call npm run build
 if errorlevel 1 exit /b 1
 
-echo [3/3] Native libs + jarvis-gui release...
+echo [3/4] Native libs + jarvis-app release...
 cd /d "%ROOT%"
 python "%ROOT%scripts\tools\post_build.py" --force
+cargo build -p jarvis-app --release
+if errorlevel 1 exit /b 1
+
+echo [4/4] jarvis-gui release...
 cargo build -p jarvis-gui --release
 if errorlevel 1 exit /b 1
 
 echo.
 echo Ready: %ROOT%target\release\jarvis-gui.exe
+echo Assistant: %ROOT%target\release\jarvis-app.exe
 for %%F in ("%ROOT%target\release\jarvis-gui.exe") do echo Time: %%~tF
 echo Close tray and run your VBS launcher.
 exit /b 0

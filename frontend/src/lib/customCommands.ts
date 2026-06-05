@@ -26,6 +26,7 @@ export interface CustomCommandsConfig {
     thanks_phrases: string[]
     shutdown_phrases: string[]
     weather_phrases: string[]
+    greeting_phrases: string[]
     user_commands: UserCommand[]
 }
 

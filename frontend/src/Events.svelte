@@ -22,13 +22,5 @@
             }
         })
 
-        // assistant state events
-        await listen("assistant-greet", () => {
-            document.getElementById("arc-reactor")?.classList.add("active")
-        })
-
-        await listen("assistant-waiting", () => {
-            document.getElementById("arc-reactor")?.classList.remove("active")
-        })
     })
 </script>
